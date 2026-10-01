@@ -1,0 +1,24 @@
+{
+  "name": "zhiyou-games",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Knowledge games for the browser, starting with an information theory strategy game.",
+  "scripts": {
+    "start": "node scripts/dev.js",
+    "dev": "node scripts/dev.js",
+    "compile": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "node scripts/build.js",
+    "preview": "node server.js --dist",
+    "pretest": "npm run compile",
+    "test": "node --test",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

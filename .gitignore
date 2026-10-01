@@ -1,0 +1,12 @@
+node_modules/
+artifacts/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+dist/
+.build/
+.wrangler/
+.netlify/
+.env
+.env.*
