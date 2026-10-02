@@ -28,7 +28,7 @@ export function storyResult(session: Session, mission: Mission, result: RoundRes
     <div class="story-reply"><span class="reply-avatar">${icon(won ? "dish" : "info")}</span><div><span>${won ? mission.destination : "林岚 · 值班长"}</span><p>${message}</p></div></div>
     ${won ? `<div class="story-earned">${stars(session.stars)}<span>本章共发送 ${session.totalBits} bit${mission.independent ? ` · ${session.hintLevel ? "参考提示" : "独立通过"}` : ""}</span></div><div class="story-learned"><span>${mission.independent ? "方案复盘" : "本章笔记"}</span><p>${mission.independent ? mission.takeaway : STORY[mission.id].learning}</p></div>` : ""}
     ${won && mission.id === 8 ? '<p class="modal-intro">基础考核完成。接下来四关会加入分包补位、信道窗口和后续码本成本，需要提前规划多轮发送。</p>' : ""}
-    ${won && mission.id === MISSIONS.length ? `<p class="modal-intro">十份返航请求全部交付，最后一艘船也已靠港。${session.stars < 3 ? "可以回看各轮成本，再试着达到三星目标。" : "总成本达到三星目标。"}值班记录已经保存，还可以返回其他航段。</p>` : ""}
+    ${won && mission.id === MISSIONS.length ? `<p class="modal-intro">${mission.packets.length} 份请求全部交付，这一班结束了。${session.stars < 3 ? "可以回看各轮成本，再试着达到三星目标。" : "总成本达到三星目标。"}值班记录已经保存，还可以返回其他航段。</p>` : ""}
     <button class="text-button" data-action="detail-result">查看比特与解码记录 ${icon("arrow")}</button>
     <div class="modal-actions">
       <button class="secondary-button" data-action="${lost ? "restart" : "close"}">${lost ? "重新体验本章" : "返回值班席"}</button>

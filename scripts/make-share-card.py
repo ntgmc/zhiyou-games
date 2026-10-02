@@ -54,7 +54,7 @@ text((67, 159), "深空通信站", 66, "#e0eeeb")
 text((74, 276), "一段信号，一次来自远方的回应。", 26, "#b2c8c6")
 text((74, 338), "跟随剧情，亲手压缩消息、修复错误。", 22, "#829da8")
 text((74, 474), "信息熵  /  哈夫曼编码  /  汉明纠错", 18, "#9ab9b0")
-text((74, 526), "18 个航段 · 独立挑战 · 原创配乐", 17, "#6c8d9b")
+text((74, 526), "24 个航段 · 综合值班 · 原创配乐", 17, "#6c8d9b")
 text((836, 528), "MIRA / SECTOR 04", 12, "#5b8790")
 
 image.resize((1200, 630), Image.Resampling.LANCZOS).save(ROOT / "assets/share-card.png", optimize=True)

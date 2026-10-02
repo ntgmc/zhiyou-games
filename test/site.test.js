@@ -12,6 +12,7 @@ import { storyResult, detailedResult } from "../.build/src/games/information/res
 test("each catalog entry has an independent static page and game code stays outside the home entry", async () => {
   assert.ok(GAMES.length);
   assert.equal(new Set(GAMES.map(({ id }) => id)).size, GAMES.length);
+  assert.equal(GAMES.find(({ id }) => id === "information").chapters, MISSIONS.length);
   for (const game of GAMES) {
     assert.match(game.href, /^\.\/games\/[a-z][a-z0-9-]*\/$/);
     const html = await readFile(new URL(`../${game.href}index.html`, import.meta.url), "utf8");

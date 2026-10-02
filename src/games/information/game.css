@@ -967,6 +967,18 @@ h1 { font-size: clamp(23px, 2.2vw, 33px); font-weight: 600; letter-spacing: 1px;
 .planning-records .icon, .packet-breakdown .icon { width: 13px; height: 13px; }
 .planning-records .text-button { display: block; text-align: left; font-size: 10px; padding: 9px 0 0; }
 .planning-records p { margin-top: 10px; }
+.queue-overview { min-width: 0; margin: 8px 0 16px; border: 1px solid #35515d; border-radius: 6px; padding: 12px; color: #b3c7cc; font-size: 11px; }
+.queue-overview summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; min-height: 32px; }
+.queue-overview summary .icon { width: 14px; height: 14px; flex-shrink: 0; }
+.queue-overview[open] summary .icon { transform: rotate(90deg); }
+.queue-overview p { line-height: 1.8; margin: 8px 0; }
+.queue-scroll { max-width: 100%; max-height: 420px; overflow: auto; }
+.queue-overview table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.queue-overview th, .queue-overview td { padding: 9px 10px; border-bottom: 1px solid #2d4550; text-align: center; }
+.queue-overview th { color: #d0dedc; font-weight: 400; }
+.queue-overview thead th { position: sticky; top: 0; background: var(--bg); }
+.queue-overview th:first-child { text-align: left; }
+.queue-overview th small, .queue-overview tbody th span { display: block; font-size: 10px; color: #a2bac2; margin-bottom: 3px; }
 .console-planning { padding: 0 22px; background: #11232a; border: 1px solid #28414b; border-radius: 7px; margin-bottom: 20px; }
 .console-planning .window-forecast { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .console-planning .planning-records { display: none; }

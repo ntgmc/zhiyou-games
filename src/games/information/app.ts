@@ -24,7 +24,8 @@ const siteHome = new URL("../../", location.href);
 if (new URLSearchParams(location.search).has("test")) siteHome.searchParams.set("test", "1");
 const saved = readSave(STORAGE_KEY);
 const progress = saved.progress;
-const chapterRanges: [number, number, string][] = [[1, 5, "学习基础 · 1～5"], [6, 8, "独立考核 · 6～8"], [9, 12, "进阶航段 · 9～12"], [13, MISSIONS.length, `返航值班 · 13～${MISSIONS.length}`]];
+const chapterRanges: [number, number, string][] = [[1, 5, "学习基础 · 1～5"], [6, 8, "独立考核 · 6～8"], [9, 12, "进阶航段 · 9～12"], [13, 18, "返航值班 · 13～18"], [19, MISSIONS.length, `综合值班 · 19～${MISSIONS.length}`]];
+const campaignEntries = [9, 13, 19];
 let mission = MISSIONS.find((item) => item.id === saved.activeId) || MISSIONS[0];
 let session = prepareStory(saved.session?.missionId === mission.id ? saved.session : createSession(mission), mission);
 let consoleMode = progress.consoleMode === true;
@@ -35,6 +36,7 @@ let treeState: TreeState = { forest: [], selected: [], undo: [], next: 4, feedba
 let labState: LabState = { data: "1011", flipped: [], corrected: false };
 let tuningOpen = false;
 let futureForecastOpen = false;
+let queueOverviewOpen = false;
 let lastFocus: HTMLElement | null = null;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 const music = new GameAudio({
@@ -96,7 +98,7 @@ function renderConsole() {
         <div class="sidebar-section-heading">通信员航段计划 <span>${String(completed).padStart(2, "0")} / ${MISSIONS.length}</span></div>
         <nav class="mission-nav" aria-label="关卡选择">
           ${MISSIONS.map((item) => {
-            const unlocked = item.id <= progress.unlocked || [9, 13].includes(item.id);
+            const unlocked = item.id <= progress.unlocked || campaignEntries.includes(item.id);
             const won = progress.best[item.id] > 0;
             return `<button class="mission-nav-item ${item.id === mission.id ? "selected" : ""} ${won ? "completed" : ""}" data-action="mission" data-id="${item.id}" ${unlocked ? "" : "disabled"} aria-label="第 ${item.id} 章 ${item.chapter}" aria-current="${item.id === mission.id ? "step" : "false"}">
               <span class="mission-index">${won ? icon("check") : unlocked ? String(item.id).padStart(2, "0") : icon("lock")}</span>
@@ -321,8 +323,25 @@ function renderPlanningBrief() {
       return `<div class="window-slot ${i + 1 === session.round ? "current" : ""} ${i + 1 < session.round ? "past" : ""}"><span>第 ${i + 1} 轮${i + 1 === session.round ? " · 当前" : ""}</span><strong>${window.budget}<small> bit</small></strong><em class="${window.noise.type === "none" ? "quiet-window" : ""}">${window.noise.label}</em></div>`;
     }).join("")}</div>` : ""}
     ${mission.totalBudget != null ? `<div class="total-budget"><span>整次值班剩余</span><strong>${mission.totalBudget - session.totalBits}<small> / ${mission.totalBudget} bit</small></strong><p>数据、保护、补位与同步全部计入。各轮余量不结转。</p></div>` : ""}
+    ${mission.id >= 19 ? renderQueueOverview() : ""}
     ${mission.rounds > 1 ? `<details class="planning-records"><summary>前几轮发送记录 ${icon("chevron")}</summary>${session.history.length ? session.history.map((result, i) => `<button class="text-button" data-action="history" data-index="${i}">第 ${result.round} 轮 · ${result.totalBits} bit · ${result.skipped ? "等待" : result.packets.map(({ name }) => name).join("、")}</button>`).join("") : '<p>尚未发送。未来请求的频率和抵达轮次可在消息卡片上查看。</p>'}</details>` : ""}
   </div>`;
+}
+
+function renderQueueOverview() {
+  return `<details class="queue-overview" ${queueOverviewOpen ? "open" : ""}><summary>整班请求总表 · ${mission.packets.length} 份 ${icon("chevron")}</summary>
+    <p>频数与轮次全部已知。表格可横向滚动，发送方案由你安排。</p>
+    <div class="queue-scroll" tabindex="0" role="region" aria-label="整班请求表，可横向滚动">
+      <table><caption class="sr-only">各请求的指令频数、抵达轮次、截止轮次与交付状态</caption>
+        <thead><tr><th scope="col">请求</th>${SYMBOLS.map(({ id, label }) => `<th scope="col">${id}<small>${label}</small></th>`).join("")}<th scope="col">抵达</th><th scope="col">截止</th><th scope="col">状态</th></tr></thead>
+        <tbody>${mission.packets.map((packet, index) => {
+          const counts = countSymbols(packet.tokens);
+          const state = session.taskStates[packet.id];
+          const status = state === "delivered" ? "已交付" : state === "failed" ? "解码错误" : state === "expired" ? "已超时" : !packetAvailable(packet, session.round) ? "未抵达" : packet.deadline === session.round ? "本轮到期" : "待发送";
+          return `<tr><th scope="row"><span class="mono">MSG-${String(index + 1).padStart(3, "0")}</span>${packet.name}</th>${SYMBOLS.map(({ id }) => `<td class="mono">${counts[id]}</td>`).join("")}<td>${packet.releaseRound || 1}</td><td>${packet.deadline}</td><td>${status}</td></tr>`;
+        }).join("")}</tbody>
+      </table>
+    </div></details>`;
 }
 
 function renderCostBreakdown() {
@@ -541,13 +560,14 @@ function renderEndBanner() {
 }
 
 function setMission(id: number) {
-  if ((id > progress.unlocked && ![9, 13].includes(id)) || busy) return;
+  if ((id > progress.unlocked && !campaignEntries.includes(id)) || busy) return;
   const nextMission = MISSIONS.find((item) => item.id === id);
   if (!nextMission) return;
   mission = nextMission;
-  if ([9, 13].includes(id)) progress.unlocked = Math.max(progress.unlocked, id);
+  if (campaignEntries.includes(id)) progress.unlocked = Math.max(progress.unlocked, id);
   tuningOpen = false;
   futureForecastOpen = false;
+  queueOverviewOpen = false;
   session = prepareStory(createSession(mission), mission);
   closeModal();
   save();
@@ -559,6 +579,7 @@ function restart() {
   if (busy) return;
   tuningOpen = false;
   futureForecastOpen = false;
+  queueOverviewOpen = false;
   session = prepareStory(createSession(mission), mission);
   closeModal();
   save();
@@ -571,6 +592,8 @@ function commitAction(action: string) {
   if (tuning) tuningOpen = tuning.open;
   const forecast = $<HTMLDetailsElement>(".future-forecast");
   if (forecast) futureForecastOpen = forecast.open;
+  const overview = $<HTMLDetailsElement>(".queue-overview");
+  if (overview) queueOverviewOpen = overview.open;
   const moved = !consoleMode && advanceStory(session, mission, action);
   save();
   render();
@@ -620,7 +643,8 @@ function renderModal() {
       <div class="story-menu-options"><button class="secondary-button" data-action="replay-story">${icon("reset")}重新体验本章剧情</button><button class="secondary-button" data-action="console-mode">${icon("grid")}打开完整控制台</button><button class="secondary-button" data-action="academy">${icon("book")}查阅通信手册</button><button class="secondary-button" data-action="music">${icon("music")}音乐设置</button></div>
       <div class="challenge-entry"><div><strong>熟悉编码和纠错？</strong><p>可以从第 9 航段开始，后续逐关解锁，自行设计方案。</p></div><button class="secondary-button" data-action="mission" data-id="9">进入进阶航段 ${icon("arrow")}</button></div>
       <div class="challenge-entry"><div><strong>继续第 12 关之后的值班</strong><p>第 13 航段起需要规划整次发送。后续会用到手工码本、混合保护和六轮队列，提示按需查看。</p></div><button class="secondary-button" data-action="mission" data-id="13">接通返航线 ${icon("arrow")}</button></div>
-      ${chapterRanges.map(([first, last, title]) => `<div class="small-section-title">${title}<span>${first === 1 ? "剧情互动教学" : first === 6 ? "自主设计通信方案" : first === 9 ? "窗口与同步" : "完整计划与手工码本"}</span></div><div class="chapter-choices">${MISSIONS.filter(({ id }) => id >= first && id <= last).map((item) => `<button class="chapter-choice ${item.id === mission.id ? "current" : ""}" data-action="mission" data-id="${item.id}" ${item.id > progress.unlocked && ![9, 13].includes(item.id) ? "disabled" : ""}><span class="mono">${String(item.id).padStart(2, "0")}</span><strong>${item.chapter}${progress.soloBest?.[item.id] ? '<small class="solo-mark">独立通过</small>' : ""}</strong>${progress.best[item.id] ? stars(progress.best[item.id]) : item.id > progress.unlocked && ![9, 13].includes(item.id) ? icon("lock") : icon("arrow")}</button>`).join("")}</div>`).join("")}
+      <div class="challenge-entry"><div><strong>准备好排一整班了吗？</strong><p>从第 19 航段起综合使用已有知识。队列逐步增至三十份请求，终关建议预留 1～2 小时独立规划。</p></div><button class="secondary-button" data-action="mission" data-id="19">进入综合值班 ${icon("arrow")}</button></div>
+      ${chapterRanges.map(([first, last, title]) => `<div class="small-section-title">${title}<span>${first === 1 ? "剧情互动教学" : first === 6 ? "自主设计通信方案" : first === 9 ? "窗口与同步" : first === 13 ? "完整计划与手工码本" : "综合调度与预算"}</span></div><div class="chapter-choices">${MISSIONS.filter(({ id }) => id >= first && id <= last).map((item) => `<button class="chapter-choice ${item.id === mission.id ? "current" : ""}" data-action="mission" data-id="${item.id}" ${item.id > progress.unlocked && !campaignEntries.includes(item.id) ? "disabled" : ""}><span class="mono">${String(item.id).padStart(2, "0")}</span><strong>${item.chapter}${progress.soloBest?.[item.id] ? '<small class="solo-mark">独立通过</small>' : ""}</strong>${progress.best[item.id] ? stars(progress.best[item.id]) : item.id > progress.unlocked && !campaignEntries.includes(item.id) ? icon("lock") : icon("arrow")}</button>`).join("")}</div>`).join("")}
       <p class="microcopy">重新体验会重置本章当前的发送记录，已经获得的星级与解锁进度会保留。</p>
       <p class="microcopy">档案保存在这台设备的当前浏览器中。换设备、换网址或清理浏览器数据后，进度不会自动同步。</p>
     `, "story-menu-modal");
@@ -872,6 +896,7 @@ document.addEventListener("toggle", (event) => {
   if (!(event.target instanceof HTMLDetailsElement)) return;
   if (event.target.classList.contains("story-tuning")) tuningOpen = event.target.open;
   if (event.target.classList.contains("future-forecast")) futureForecastOpen = event.target.open;
+  if (event.target.classList.contains("queue-overview")) queueOverviewOpen = event.target.open;
 }, true);
 
 document.addEventListener("keydown", (event) => {
@@ -884,7 +909,7 @@ document.addEventListener("keydown", (event) => {
     if (event.shiftKey && (document.activeElement === first || !modalRoot.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && (document.activeElement === last || !modalRoot.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
   }
-  if (event.key === "Enter" && !modal && !busy && !["INPUT", "BUTTON", "A"].includes(document.activeElement?.tagName || "")) {
+  if (event.key === "Enter" && !modal && !busy && !["INPUT", "BUTTON", "A", "SUMMARY"].includes(document.activeElement?.tagName || "")) {
     event.preventDefault(); transmit();
   }
 });

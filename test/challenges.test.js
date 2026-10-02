@@ -265,8 +265,8 @@ test("the final shift punishes legal local choices at both protocol handoffs", (
 });
 
 test("the return campaign has mandatory stakes and a forecast for every round", () => {
-  assert.deepEqual(MISSIONS.map(({ id }) => id), Array.from({ length: 18 }, (_, i) => i + 1));
-  for (const mission of MISSIONS.filter(({ id }) => id >= 13)) {
+  assert.deepEqual(MISSIONS.map(({ id }) => id), Array.from({ length: 24 }, (_, i) => i + 1));
+  for (const mission of MISSIONS.filter(({ id }) => id >= 13 && id <= 18)) {
     assert.equal(mission.independent, true);
     assert.equal(mission.hints.length, 3);
     assert.equal(mission.windows.length, mission.rounds);
