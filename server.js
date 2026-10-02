@@ -42,14 +42,14 @@ const server = createServer(async (req, res) => {
       return;
     }
     const pathname = decodeURIComponent(url.pathname.slice(base.length));
-    if (/^\/games\/[a-z][a-z0-9-]*$/.test(pathname)) {
+    if (/^\/(?:games\/[a-z][a-z0-9-]*|status|versions)$/.test(pathname)) {
       const directory = resolve(root, `.${pathname}`);
       if ((await stat(resolve(directory, "index.html"))).isFile()) {
         res.writeHead(308, { Location: `${base}${pathname}/${url.search}` }).end();
         return;
       }
     }
-    const page = /^\/games\/[a-z][a-z0-9-]*\/(?:index\.html)?$/.test(pathname);
+    const page = /^\/(?:games\/[a-z][a-z0-9-]*|status|versions)\/(?:index\.html)?$/.test(pathname);
     // Preview is intentionally limited to public game files, including in source mode.
     if (pathname.includes("\\") || pathname.split("/").some((part) => part.startsWith(".")) ||
         !(published

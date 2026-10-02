@@ -6,6 +6,10 @@
 
 浏览器代码使用严格模式 TypeScript，编译为原生 JavaScript 模块后部署到 GitHub Pages。没有运行时框架，首页与每款游戏分别加载自己的入口和样式；首页不会加载信息论引擎或音乐。页面是普通静态 HTML，支持直接访问、刷新和项目子目录部署。
 
+首页导航提供 `/status/` 状态页和 `/versions/` 版本信息页。状态页展示当前版本已开放的游戏、章节数与知识主题，不提供实时故障监测。版本页展示 `package.json` 中的站点版本、整站内容版本、各游戏的内容版本和构建时间。
+
+内容版本在构建时根据文件内容生成，同样的内容重复构建会得到相同标识。每款游戏的标识包含该游戏的目录信息、页面、代码和样式，以及共用代码与资源；共用资源更新时，多个游戏的标识可能一起变化。构建时间单独记录，不参与内容版本计算。源码开发模式显示“开发预览”，发布包显示实际版本。版本标识与游戏存档格式版本分别维护。
+
 ## 启动
 
 需要 Node.js 20 或以上版本（推荐与 CI 一致的 Node.js 24）和 npm。先安装锁定的开发依赖，再启动：
@@ -216,6 +220,8 @@ git push
 - `games/information/index.html`：信息论游戏独立入口。
 - `src/site/catalog.ts`：游戏目录元数据，新增游戏在此登记。
 - `src/site/home.ts` / `site.css`：目录卡片与首页样式。
+- `status/index.html` / `versions/index.html`：游戏状态与版本信息入口。
+- `src/site/info.ts`：状态与版本展示，复用游戏目录；发布信息由构建写入页面。
 - `src/shared/html.ts`：HTML 文本转义。
 - `src/games/information/types.ts`：任务、码本、状态和剧情的类型。
 - `src/games/information/engine.ts`：纯编码算法、干扰与状态机。

@@ -77,6 +77,23 @@ async function verify() {
     ...["orbit", "code", "storm", "arrival"].map((id) =>
       [new URL(`../../../assets/music/${id}.mp3`, gameAppUrl), /^audio\/(?:mpeg|mp3)(?:;|$)/]),
   ];
+  for (const name of ["status", "versions"]) {
+    const pageUrl = new URL(`${name}/`, site);
+    const pageHtml = await (await get(pageUrl)).text();
+    const entry = pageHtml.match(/src="([^"]+\/src\/site\/info\.js)"/)?.[1];
+    const stylesheet = pageHtml.match(/href="([^"]+\/src\/site\/site\.css)"/)?.[1];
+    if (!entry || !stylesheet || !pageHtml.includes(`rel="canonical" href="${pageUrl.href}"`)
+      || !/name="release-info" content="[^"]+"/.test(pageHtml)) {
+      throw new Error(`The ${name} page, its canonical URL or release metadata is missing.`);
+    }
+    const entryUrl = new URL(entry, pageUrl);
+    checks.push(
+      [entryUrl, /(?:javascript|ecmascript)/],
+      [new URL(stylesheet, pageUrl), /text\/css/],
+      [new URL("./catalog.js", entryUrl), /(?:javascript|ecmascript)/],
+      [new URL("../shared/html.js", entryUrl), /(?:javascript|ecmascript)/],
+    );
+  }
   const outcomes = await Promise.allSettled(checks.map(async ([url, mime]) => {
     const response = await get(url, "HEAD");
     const type = response.headers.get("content-type") || "";

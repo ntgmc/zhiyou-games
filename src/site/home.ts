@@ -26,7 +26,7 @@ if (count) count.textContent = `${String(GAMES.length).padStart(2, "0")} 款游�
 
 // Keep isolated browser test profiles when moving between the directory and a game.
 if (new URLSearchParams(location.search).has("test")) {
-  for (const link of document.querySelectorAll<HTMLAnchorElement>('a[href*="games/"]')) {
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('a[href*="games/"], a[href="./status/"], a[href="./versions/"]')) {
     const url = new URL(link.href);
     url.searchParams.set("test", "1");
     link.href = url.href;

@@ -22,6 +22,20 @@ function escapeAttribute(value) {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 }
 
+function contentVersion(entries) {
+  const hash = createHash("sha256");
+  for (const [file, content] of entries) hash.update(file).update("\0").update(content).update("\0");
+  return hash.digest("hex").slice(0, 12);
+}
+
+export function gameContentVersion(game, pages, entries) {
+  return contentVersion([
+    ["catalog", JSON.stringify(game)],
+    ...pages.filter(([file]) => file.startsWith(`games/${game.id}/`)),
+    ...entries.filter(([file]) => file.startsWith(`src/games/${game.id}/`) || file.startsWith("src/shared/") || file.startsWith("assets/")),
+  ]);
+}
+
 function publicUrl(value) {
   if (!value) return null;
   const url = new URL(value);
@@ -41,19 +55,23 @@ export async function buildSite({ siteUrl = process.env.SITE_URL, quiet = false 
     const file = source.replace(/\.ts$/, ".js");
     return [file, await readFile(resolve(root, source.endsWith(".ts") ? `.build/${file}` : file))];
   }));
-  const pageFiles = ["index.html", ...(await filesIn("games")).filter((file) => file.endsWith(".html"))];
+  const pageFiles = ["index.html", "status/index.html", "versions/index.html", ...(await filesIn("games")).filter((file) => file.endsWith(".html"))];
   const pages = await Promise.all(pageFiles.map(async (file) => [file, await readFile(resolve(root, file), "utf8")]));
   const [headers, notFoundSource] = await Promise.all([
     readFile(resolve(root, "deploy/_headers"), "utf8"),
     readFile(resolve(root, "deploy/404.html"), "utf8"),
   ]);
-  const hash = createHash("sha256");
-  for (const [file, content] of pages) hash.update(file).update("\0").update(content);
-  for (const [file, content] of entries) hash.update(file).update("\0").update(content);
-  const version = hash.digest("hex").slice(0, 12);
+  const { GAMES } = await import("../.build/src/site/catalog.js");
+  const { version: siteVersion } = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+  const version = contentVersion([...pages, ...entries, ["site-version", siteVersion]]);
+  const releaseInfo = {
+    siteVersion, contentVersion: version, builtAt: new Date().toISOString(),
+    games: Object.fromEntries(GAMES.map((game) => [game.id, gameContentVersion(game, pages, entries)])),
+  };
   const release = `static/${version}`;
   const builtPages = pages.map(([file, sourceHtml]) => {
-    let html = sourceHtml.replace(/(href|src)="(?:\.\/|\.\.\/)+((?:src|assets)\/[^"]+)"/g, (_, attribute, resource) => {
+    let html = sourceHtml.replace('<meta name="release-info" content="" />', `<meta name="release-info" content="${escapeAttribute(JSON.stringify(releaseInfo))}" />`);
+    html = html.replace(/(href|src)="(?:\.\/|\.\.\/)+((?:src|assets)\/[^"]+)"/g, (_, attribute, resource) => {
       const path = relative(dirname(file), `${release}/${resource}`).split(sep).join("/");
       return `${attribute}="${path.startsWith(".") ? path : `./${path}`}"`;
     });
@@ -105,7 +123,7 @@ export async function buildSite({ siteUrl = process.env.SITE_URL, quiet = false 
     console.log("只发布 dist 文件夹的内容。音乐已包含，不需要运行 Node 服务。");
     if (!base) console.log("设置 SITE_URL 后重新构建，可加入完整的分享图片网址。");
   }
-  return { directory: publishRoot, version, bytes, release };
+  return { directory: publishRoot, version, bytes, release, releaseInfo };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

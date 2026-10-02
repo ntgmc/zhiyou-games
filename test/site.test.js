@@ -27,6 +27,8 @@ test("each catalog entry has an independent static page and game code stays outs
   }
   const home = await readFile(new URL("../.build/src/site/home.js", import.meta.url), "utf8");
   assert.doesNotMatch(home, /from ["'].*games\//);
+  const info = await readFile(new URL("../.build/src/site/info.js", import.meta.url), "utf8");
+  assert.doesNotMatch(info, /from ["'].*games\//);
 });
 
 test("the relocated game restores version-one progress and current sessions", () => {

@@ -3,15 +3,57 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { buildSite, publishRoot } from "../scripts/build.js";
+import { buildSite, gameContentVersion, publishRoot } from "../scripts/build.js";
 import { resolve } from "node:path";
+
+test("game content versions track game changes and shared resources independently of other games", () => {
+  const game = { id: "information", title: "深空通信站", chapters: 24 };
+  const pages = [["games/information/index.html", "game page"], ["games/network/index.html", "other page"]];
+  const entries = [
+    ["src/games/information/app.js", "game code"],
+    ["src/games/information/game.css", "game style"],
+    ["src/games/network/app.js", "other game"],
+    ["src/shared/html.js", "shared code"],
+    ["assets/music/orbit.mp3", "shared resource"],
+    ["src/site/site.css", "site style"],
+  ];
+  const original = gameContentVersion(game, pages, entries);
+  assert.match(original, /^[a-f0-9]{12}$/);
+  assert.equal(gameContentVersion(game, pages, entries), original);
+  for (const file of ["src/games/information/app.js", "src/games/information/game.css", "src/shared/html.js", "assets/music/orbit.mp3"]) {
+    const changed = entries.map(([path, content]) => [path, path === file ? `${content} changed` : content]);
+    assert.notEqual(gameContentVersion(game, pages, changed), original, file);
+  }
+  for (const file of ["src/games/network/app.js", "src/site/site.css"]) {
+    const changed = entries.map(([path, content]) => [path, path === file ? `${content} changed` : content]);
+    assert.equal(gameContentVersion(game, pages, changed), original, file);
+  }
+  assert.notEqual(gameContentVersion({ ...game, chapters: 25 }, pages, entries), original);
+  assert.notEqual(gameContentVersion(game, [[pages[0][0], "new game page"], pages[1]], entries), original);
+  assert.equal(gameContentVersion(game, [pages[0], [pages[1][0], "new other page"]], entries), original);
+});
 
 test("publish builds contain only public files, keep subpath imports valid and apply production headers", async () => {
   const build = await buildSite({ siteUrl: "https://example.com/zhiyou-games/", quiet: true });
   const html = await readFile(resolve(publishRoot, "index.html"), "utf8");
   assert.match(html, new RegExp(`\\./static/${build.version}/src/site/home\\.js`));
   assert.match(html, /https:\/\/example\.com\/zhiyou-games\/static\/[a-f0-9]+\/assets\/share-card\.png/);
-  assert.deepEqual((await readdir(publishRoot)).sort(), [".nojekyll", "404.html", "_headers", "games", "index.html", "static"]);
+  assert.deepEqual((await readdir(publishRoot)).sort(), [".nojekyll", "404.html", "_headers", "games", "index.html", "static", "status", "versions"]);
+  const packageInfo = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(build.releaseInfo.siteVersion, packageInfo.version);
+  assert.equal(build.releaseInfo.contentVersion, build.version);
+  assert.ok(Number.isFinite(Date.parse(build.releaseInfo.builtAt)));
+  assert.deepEqual(Object.keys(build.releaseInfo.games).sort(), ["game-theory", "information", "network", "probability"]);
+  for (const version of Object.values(build.releaseInfo.games)) assert.match(version, /^[a-f0-9]{12}$/);
+  for (const name of ["status", "versions"]) {
+    const infoHtml = await readFile(resolve(publishRoot, `${name}/index.html`), "utf8");
+    assert.match(infoHtml, new RegExp(`\\.\\./${build.release}/src/site/info\\.js`));
+    assert.ok(infoHtml.includes(`rel="canonical" href="https://example.com/zhiyou-games/${name}/"`));
+    const entities = { "&quot;": '"', "&amp;": "&", "&lt;": "<", "&gt;": ">", "&#39;": "'" };
+    const metadata = infoHtml.match(/name="release-info" content="([^"]+)"/)[1]
+      .replace(/&(?:quot|amp|lt|gt|#39);/g, (entity) => entities[entity]);
+    assert.deepEqual(JSON.parse(metadata), build.releaseInfo, "both pages describe the same build");
+  }
   const css = await readFile(resolve(publishRoot, build.release, "src/games/information/game.css"), "utf8");
   assert.doesNotMatch(css, /@import|fonts\.google/);
   const audio = await readFile(resolve(publishRoot, build.release, "src/games/information/audio.js"), "utf8");
@@ -34,6 +76,7 @@ test("publish builds contain only public files, keep subpath imports valid and a
   }
   const repeated = await buildSite({ siteUrl: "https://example.com/zhiyou-games/", quiet: true });
   assert.equal(repeated.version, build.version, "content version is reproducible");
+  assert.deepEqual(repeated.releaseInfo.games, build.releaseInfo.games, "game versions are reproducible");
   await assert.rejects(buildSite({ siteUrl: "https://user:secret@example.com" }), /SITE_URL/);
   assert.equal(await readFile(resolve(publishRoot, "index.html"), "utf8"), html, "invalid settings preserve the last build");
 
@@ -65,6 +108,24 @@ test("publish builds contain only public files, keep subpath imports valid and a
     const pageHtml = await page.text();
     const moduleUrl = new URL(pageHtml.match(/src="([^"]+home\.js)"/)[1], `${base}/zhiyou-games/`);
     assert.equal((await fetch(moduleUrl)).status, 200);
+    for (const name of ["status", "versions"]) {
+      const infoUrl = `${base}/zhiyou-games/${name}/`;
+      const infoResponse = await fetch(`${infoUrl}?test=1`);
+      assert.equal(infoResponse.status, 200, "information pages support direct links and reloads");
+      assert.equal(infoResponse.headers.get("cache-control"), "no-cache");
+      const infoHtml = await infoResponse.text();
+      for (const path of [...infoHtml.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map((match) => match[1])) {
+        const resource = await fetch(new URL(path, infoUrl));
+        assert.equal(resource.status, 200);
+        assert.match(resource.headers.get("content-type"), path.endsWith(".css") ? /text\/css/ : /javascript/);
+      }
+      const infoModule = new URL(infoHtml.match(/src="([^"]+info\.js)"/)[1], infoUrl);
+      assert.equal((await fetch(new URL("./catalog.js", infoModule))).status, 200);
+      assert.equal((await fetch(new URL("../shared/html.js", infoModule))).status, 200);
+      const redirect = await fetch(`${base}/zhiyou-games/${name}?test=1`, { redirect: "manual" });
+      assert.equal(redirect.headers.get("location"), `/zhiyou-games/${name}/?test=1`);
+      assert.equal((await fetch(`${infoUrl}index.html`)).status, 200);
+    }
     const gameUrl = `${base}/zhiyou-games/games/information/`;
     const gamePage = await fetch(gameUrl);
     assert.equal(gamePage.status, 200);
