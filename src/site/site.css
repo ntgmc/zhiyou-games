@@ -57,6 +57,11 @@ h2 { font-size: 28px; font-weight: 500; margin-top: 7px; text-wrap: balance; }
 .boat-white { background: #315952; top: 22%; left: 20%; }.boat-other { background: #8d8467; bottom: 18%; left: 40%; }
 .cover-label, .cover-payoff { position: absolute; font-size: 11px; letter-spacing: 2px; color: #536e63; }
 .cover-label { left: 6%; bottom: 0; }.cover-payoff { left: 43%; top: 44%; padding: 0 8px; background: #e0e9e3; }
+.game-art.repair-art { background: #e7dec8; color: #364d43; }
+.repair-art .art-label > span, .repair-art .art-caption > span { color: #586d5b; }
+.repair-cover { flex: 1; align-self: center; width: 82%; margin: 22px 0; padding: 16px; background: #fffcf2; border: 1px solid #c0b69d; border-top: 8px solid #6c826c; transform: rotate(-3deg); }
+.repair-cover > span { font-size: 12px; }.repair-cover small { font-size: 10px; color: #6c7866; }
+.repair-cells { font: 28px/1.7 monospace; color: #6c826c; margin: 14px 0; white-space: nowrap; }
 .game-art { background: #102630; color: #c5dcd8; min-height: 330px; display: flex; flex-direction: column; padding: 24px; position: relative; overflow: hidden; }
 .art-label { display: flex; justify-content: space-between; font: 9px Consolas, monospace; letter-spacing: 1.5px; z-index: 1; }
 .art-label > span { color: #7aa69c; }

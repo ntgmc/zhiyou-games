@@ -23,6 +23,9 @@ test("publish builds contain only public files, keep subpath imports valid and a
   assert.match(harborHtml, new RegExp(`\\.\\./\\.\\./${build.release}/src/games/game-theory/app\\.js`));
   assert.match(harborHtml, new RegExp(`\\.\\./\\.\\./${build.release}/src/games/game-theory/tokens\\.css`));
   assert.match(harborHtml, /rel="canonical" href="https:\/\/example\.com\/zhiyou-games\/games\/game-theory\/"/);
+  const repairHtml = await readFile(resolve(publishRoot, "games/probability/index.html"), "utf8");
+  assert.match(repairHtml, new RegExp(`\\.\\./\\.\\./${build.release}/src/games/probability/app\\.js`));
+  assert.match(repairHtml, /rel="canonical" href="https:\/\/example\.com\/zhiyou-games\/games\/probability\/"/);
   for (const file of ["orbit", "code", "storm", "arrival"]) {
     assert.ok((await readFile(resolve(publishRoot, build.release, `assets/music/${file}.mp3`))).length > 100000);
   }
@@ -83,6 +86,16 @@ test("publish builds contain only public files, keep subpath imports valid and a
     }
     const harborRedirect = await fetch(`${base}/zhiyou-games/games/game-theory?test=1`, { redirect: "manual" });
     assert.equal(harborRedirect.headers.get("location"), "/zhiyou-games/games/game-theory/?test=1");
+    const repairUrl = `${base}/zhiyou-games/games/probability/`;
+    const repairPage = await fetch(`${repairUrl}?test=1`);
+    assert.equal(repairPage.status, 200);
+    const repairPageHtml = await repairPage.text();
+    for (const path of [...repairPageHtml.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map((match) => match[1])) {
+      assert.equal((await fetch(new URL(path, repairUrl))).status, 200);
+    }
+    const repairRedirect = await fetch(`${base}/zhiyou-games/games/probability?test=1`, { redirect: "manual" });
+    assert.equal(repairRedirect.headers.get("location"), "/zhiyou-games/games/probability/?test=1");
+    assert.equal((await fetch(`${repairUrl}?test=1`)).status, 200, "the repair game supports direct reloads");
     const song = await fetch(`${base}/zhiyou-games/${build.release}/assets/music/orbit.mp3`, { method: "HEAD" });
     assert.equal(song.status, 200);
     assert.equal(song.headers.get("content-type"), "audio/mpeg");

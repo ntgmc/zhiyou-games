@@ -29,4 +29,14 @@ export const GAMES: readonly GameEntry[] = [
     chapterLabel: "章",
     href: "./games/game-theory/",
   },
+  {
+    id: "probability",
+    title: "检修站：证据与选择",
+    subject: "概率与统计推断",
+    description: "接下街区的检修单。查清检测报告的来源，比较复检与更换的代价，取样判断一批设备，把有限的调查资源用在值得的地方。",
+    tags: ["条件概率", "贝叶斯更新", "期望损失", "批次推断"],
+    chapters: 8,
+    chapterLabel: "章",
+    href: "./games/probability/",
+  },
 ];
