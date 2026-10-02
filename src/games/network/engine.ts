@@ -67,18 +67,18 @@ export const targets = (mission: Mission): readonly Place[] => mission.places.fi
 export const cloneRoutes = (routes: readonly Route[]): Route[] => routes.map((route) => ({ nodes: [...route.nodes], amount: route.amount }));
 
 export function routeError(mission: Mission, value: unknown): string | null {
-  if (!value || typeof value !== "object") return "路线格式无效。";
+  if (!value || typeof value !== "object") return "未能读取这条路线，请重新选择。";
   const route = value as Route;
   if (!Array.isArray(route.nodes) || route.nodes.length < 2 || route.nodes.length > mission.places.length
     || !route.nodes.every((id) => typeof id === "string" && mission.places.some((place) => place.id === id))
-    || new Set(route.nodes).size !== route.nodes.length) return "请选择不重复经过地点的完整路线。";
-  if (!Number.isInteger(route.amount) || route.amount < 1 || route.amount > 100) return "箱数须为 1～100 的整数。";
+    || new Set(route.nodes).size !== route.nodes.length) return "路线要从总仓选到接收站，途中不能重复经过同一地点。";
+  if (!Number.isInteger(route.amount) || route.amount < 1 || route.amount > 100) return "请输入 1 到 100 之间的整数箱数。";
   if (route.nodes[0] !== mission.source || !targets(mission).some((place) => place.id === route.nodes.at(-1))) {
-    return "路线须从总仓出发，在接收点结束。";
+    return "路线必须从总仓出发，到接收站结束。";
   }
   for (let i = 1; i < route.nodes.length; i++) {
-    if (targets(mission).some((place) => place.id === route.nodes[i - 1])) return "到达接收点后，本条路线就结束了。";
-    if (!mission.edges.some((edge) => edge.from === route.nodes[i - 1] && edge.to === route.nodes[i])) return "这两个地点之间没有这个方向的通道。";
+    if (targets(mission).some((place) => place.id === route.nodes[i - 1])) return "到达接收站后，这条路线就结束了，不能继续经过其他地点。";
+    if (!mission.edges.some((edge) => edge.from === route.nodes[i - 1] && edge.to === route.nodes[i])) return "这两个地点之间没有可用的正向通道，请沿箭头选路。";
   }
   return null;
 }
@@ -90,7 +90,7 @@ export function analyze(mission: Mission, routes: readonly Route[]): Analysis {
     total: 0, cost: 0, errors: [],
   };
   if (!Array.isArray(routes) || routes.length > 64) {
-    analysis.errors.push("路线清单无效，最多保存 64 条路线。");
+    analysis.errors.push("未能读取运输计划，或路线超过 64 条。请删去多余路线后重新安排。");
     return analysis;
   }
   for (const route of routes) {
@@ -109,7 +109,7 @@ export function analyze(mission: Mission, routes: readonly Route[]): Analysis {
       analysis.errors.push(`${placeName(mission, edge.from)} → ${placeName(mission, edge.to)}安排了 ${analysis.flow[edge.id]} 箱，容量只有 ${edge.capacity} 箱。`);
     }
   }
-  if (analysis.total > mission.supply) analysis.errors.push(`总仓只有 ${mission.supply} 箱，草案安排了 ${analysis.total} 箱。`);
+  if (analysis.total > mission.supply) analysis.errors.push(`总仓只有 ${mission.supply} 箱，计划却安排了 ${analysis.total} 箱。请减少箱数。`);
   if (analysis.cost > mission.budget) analysis.errors.push(`运输费用 ${analysis.cost} 点，超过 ${mission.budget} 点预算。`);
   return analysis;
 }
@@ -130,8 +130,8 @@ export function execute(mission: Mission, routes: readonly Route[], side: readon
   if (mission.costGoal !== undefined && analysis.cost > mission.costGoal) failures.push(`本章要求费用不超过 ${mission.costGoal} 点，当前花了 ${analysis.cost} 点。`);
   const cut = cutFor(mission, side);
   if (mission.certificate && (!cut || cut.capacity !== analysis.total)) {
-    failures.push(cut ? `已送 ${analysis.total} 箱，分界容量是 ${cut.capacity} 箱，还没有用相等的两项数字证明运输上限。`
-      : "分界须把总仓留在一侧，接收点放在另一侧。");
+    failures.push(cut ? `本班送达 ${analysis.total} 箱，分界容量是 ${cut.capacity} 箱。两者还不相等，无法证明已经达到最大运输量。请调整路线或分界选择。`
+      : "分界要把总仓和接收站分到不同组，请重新选择与总仓同侧的地点。");
   }
   const passed = failures.length === 0;
   return { passed, stars: passed ? analysis.cost <= mission.efficient ? 3 : 2 : 0, analysis, cut, failures };
@@ -168,16 +168,16 @@ export function walk(mission: Mission, codes: readonly string[]): string[] | nul
 
 export function adjust(mission: Mission, routes: readonly Route[], codes: readonly string[], amount: number): Route[] {
   const analysis = analyze(mission, routes);
-  if (analysis.errors.length) throw new Error("先修正草案里的容量、库存或预算，再调整。");
+  if (analysis.errors.length) throw new Error("原计划已经超出容量、库存或预算。请先修改箱数或删除路线，再改排。");
   const nodes = walk(mission, codes);
   if (!nodes || !targets(mission).some((place) => place.id === nodes.at(-1))
     || !Number.isInteger(amount) || amount < 1 || amount > 100) {
-    throw new Error("请选择从总仓到接收点的完整调整路径，并填写整数箱数。");
+    throw new Error("改排时也要从总仓选到接收站，并填写 1 到 100 之间的整数箱数。");
   }
   const available = moves(mission, routes, true);
   for (const code of codes) {
     const move = available.find((item) => item.code === code);
-    if (!move || move.available < amount) throw new Error("调整量超过该段可增加或可撤回的箱数。");
+    if (!move || move.available < amount) throw new Error("这段通道不能增加或撤回这么多箱，请减少调整箱数。");
     analysis.flow[code.replace(/^-/, "")] += code.startsWith("-") ? -amount : amount;
   }
   // Decompose the adjusted flow back into ordinary delivery routes.
@@ -197,7 +197,7 @@ export function adjust(mission: Mission, routes: readonly Route[], codes: readon
     result.push({ nodes: path, amount: count });
     for (const edge of edges) analysis.flow[edge.id] -= count;
   }
-  if (Object.values(analysis.flow).some((value) => value !== 0)) throw new Error("这次调整留下了循环运输，请换一条调整路径。");
+  if (Object.values(analysis.flow).some((value) => value !== 0)) throw new Error("这次改排让部分箱子绕圈，无法组成完整的送货路线。请换一条调整路径。");
   const errors = analyze(mission, result).errors;
   if (errors.length) throw new Error(errors.join(" "));
   return result;

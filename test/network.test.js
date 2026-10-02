@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { adjust, analyze, cloneRoutes, cutFor, execute, moves, routeError, targets, walk } from "../.build/src/games/network/engine.js";
 import { MISSIONS } from "../.build/src/games/network/missions.js";
-import { advanceGuide, freshGuide, guideLength, guideReady, guideStep, guideText } from "../.build/src/games/network/story.js";
+import { advanceGuide, freshGuide, guideLength, guideReady, guideStep, guideText, renderHints } from "../.build/src/games/network/story.js";
 import { freshSave, readSave, recordScore, startChapter, writeSave } from "../.build/src/games/network/storage.js";
 
 const memory = () => {
@@ -217,4 +217,25 @@ test("save restores unfinished residual paths, drafts, cuts, scores, hints and e
   assert.deepEqual(restored.routes, overloaded.routes, "unfinished over-capacity draft can be repaired after reload");
   assert.equal(restored.result, null);
   assert.deepEqual(restored.best, {});
+});
+
+test("compact hints show content on first opening, reveal one level at a time and can hide without losing progress", () => {
+  const mission = MISSIONS[7];
+  const closed = renderHints(mission, 0, false);
+  assert.ok(closed.includes('aria-expanded="false"'));
+  assert.ok(!closed.includes('id="hint-content"'));
+  const first = renderHints(mission, 1, true);
+  assert.ok(first.includes('aria-expanded="true"'));
+  assert.ok(first.includes(mission.hints[0]));
+  assert.ok(!first.includes(mission.hints[1]));
+  assert.ok(!first.includes(mission.hints[2]));
+  assert.ok(first.includes("再看关键条件"));
+  const second = renderHints(mission, 2, true);
+  assert.ok(second.includes(mission.hints[1]));
+  assert.ok(!second.includes(mission.hints[2]));
+  const complete = renderHints(mission, 3, true);
+  mission.hints.forEach((hint) => assert.ok(complete.includes(hint)));
+  assert.ok(!complete.includes('data-command="hint-next"'));
+  assert.ok(!renderHints(mission, 3, false).includes(mission.hints[0]));
+  assert.ok(renderHints({ ...mission, hints: ['<script>"&', "", ""] }, 1, true).includes("&lt;script&gt;&quot;&amp;"));
 });

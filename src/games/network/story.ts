@@ -1,5 +1,6 @@
 import { analyze, cutFor } from "./engine.js";
 import type { Mission, Route } from "./engine.js";
+import { escapeHtml as h } from "../../shared/html.js";
 
 export type Step = "arrival" | "route" | "cost" | "capacity" | "flow" | "residual" | "cut" | "dispatch";
 const STEPS: readonly (readonly Step[])[] = [
@@ -38,12 +39,22 @@ export function readGuide(value: unknown, id: number): Guide {
 }
 export function guideText(step: Step): string {
   switch (step) {
-    case "route": return "许衡：图上的地点能收发物资，图论里叫节点。连接地点的线叫边。箭头说明允许走的方向。点选总仓，再沿箭头到河岸站，把 1 箱加入草案。加入后还没有发出。";
-    case "cost": return "许衡：每箱走过一段通道都要付费用，“点”是本班统一的经费单位。路线的费用逐段相加。地图上的远近只是排版；找最便宜的路线，在图论里叫按费用求最短路径。选一条完整路线，把 1 箱加入草案，看看总费用。";
-    case "capacity": return "许衡：容量是一条通道在这一班最多能过的箱数。北站的进站通道能过 3 箱，出站的桥只有 2 箱。先试试一口气安排 3 箱会发生什么。中转点不会凭空增减箱子，收到多少、转出多少必须相等，这叫流量守恒。";
-    case "flow": return "许衡：通道上实际安排的箱数叫流量。几条路线共用一段路，箱数要加在一起。最大流就是满足每段容量和中转平衡时，网络最多能送到的数量。先自己加两条路线，观察哪些通道共同承担运输。";
-    case "residual": return "许衡：普通路线只显示还能增加的通道。切到“调整草案”，你也能选择撤回已有安排。可增加与可撤回的通道合起来叫残量网络。撤回北站到南站的安排，会在调整路径里表现为南站回到北站。它修改尚未发出的调度单，货物没有逆向行驶。用一次包含撤回的调整，增加交付量。";
-    case "cut": return "许衡：把地点分成两侧，总仓在一侧，河岸站在另一侧，这个分界叫割。所有从总仓侧跨出的通道容量相加，给出运输量的上限；反方向跨回来的通道不加入上限。上限最小的分界叫最小割。在地图下方勾选“总仓侧的地点”，找一个容量为 5 箱的分界。";
+    case "route": return "图上的每个地点叫“节点”，连接地点的线叫“边”。物资只能沿箭头方向运送。从总仓开始，依次选北站和河岸站，填 1 箱，再点“加入运输计划”。这一步只记下路线和箱数；最后点“执行本班运输”才会送货。";
+    case "cost": return "每箱经过一段通道，都要付这段的费用。“点”是游戏里的经费单位。例如经北站送 1 箱，要花 1 + 2 = 3 点。这里说的“最短路径”就是总费用最低的路线，地图上画得近不代表便宜。先选一条路线，加入 1 箱，看看计划的总费用。";
+    case "capacity": return "一条通道在本班最多能运多少箱，叫“容量”。总仓到北站能运 3 箱，北站到河岸站的桥却只能运 2 箱。先试着安排 3 箱，看看哪里超了。箱子经过中转站时，运进几箱就要运出几箱，这叫“流量守恒”。";
+    case "flow": return "一条通道上安排的箱数叫“流量”。两条路线用到同一段路，箱数要加起来，合计不能超过容量。在每条通道都不超载、中转站进出箱数相等的条件下，最多能送到多少箱，叫“最大流”。先加两条路线，看看地图上的箱数怎么变。";
+    case "residual": return "切到“改排路线”，就能撤回计划中某一段的安排。还能增加运输的通道，加上能撤回安排的通道，合起来叫“残量网络”。例如“撤回北站 → 南站”，会减少这段原定的箱数，腾出容量。图上的反向虚线只表示修改计划，箱子仍按原通道方向运输。选一条包含撤回操作的调整路径，试着增加总送达箱数。";
+    case "cut": return "把地点分成两组，总仓在一组，河岸站在另一组，两组之间的分界叫“割”。补给必须穿过分界，所以从总仓这一组通向另一组的通道容量之和，就是运输量的上限。反方向的通道不计入这个和。容量最小的分界叫“最小割”。勾选“与总仓同侧的地点”，找出容量为 5 箱的分界。";
     default: return "";
   }
+}
+
+export function renderHints(mission: Mission, level: number, open: boolean): string {
+  return `<section class="help" aria-label="本章提示"><button class="text-button" data-command="hint-toggle"
+    aria-expanded="${open}" aria-controls="hint-content">${open ? "收起提示" : "查看提示"}</button>
+    ${open ? `<div id="hint-content" class="hint-content">
+      ${mission.hints.slice(0, level).map((hint, index) => `<div class="hint-step"><span>${["思考方向", "关键条件", "参考方案"][index]}</span><p>${h(hint)}</p></div>`).join("")}
+      ${level < 3 ? `<button class="text-button" data-command="hint-next">${level === 1 ? "再看关键条件" : "查看参考方案"}</button>` : ""}
+      <p class="muted">查看提示不扣星。本次会记为“参考提示通过”，以前的独立成绩保留。</p></div>` : ""}
+    </section>`;
 }
