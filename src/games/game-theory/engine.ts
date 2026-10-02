@@ -24,6 +24,7 @@ export interface Mission {
   goal: number;
   cooperation: number;
   depositTarget: number;
+  depositLimit?: number;
   hints: readonly [string, string, string];
   reference: readonly Plan[];
 }
@@ -82,6 +83,9 @@ export function planError(session: Session, mission: Mission, plan: Plan): strin
   if (plan.reciprocal && round.continuation === undefined) return "本章有明确终点，不能采用无限期的长期互惠方案。";
   if (plan.contract && session.cash[0] < plan.deposit + round.fee + round.reserve[0]) {
     return `签约时你需要 ${plan.deposit + round.fee + round.reserve[0]} 金币（保证金 ${plan.deposit} + 手续费 ${round.fee} + 运营周转 ${round.reserve[0]}），目前只有 ${session.cash[0]}。请降低保证金或重新排班，周转金须留在账上，不会扣除。`;
+  }
+  if (plan.contract && mission.depositLimit !== undefined && session.deposits + plan.deposit > mission.depositLimit) {
+    return `本章累计担保额度只剩 ${mission.depositLimit - session.deposits}，本班申请 ${plan.deposit}。请降低保证金；保证金退回现金后，已登记的额度也不会恢复。`;
   }
   return null;
 }

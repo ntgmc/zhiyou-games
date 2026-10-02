@@ -25,7 +25,7 @@ export const GAMES: readonly GameEntry[] = [
     subject: "博弈论",
     description: "你和岑舟共用一条航道，谁都想早点靠港。比较双方收益，定好保证金和分账，用手里的现金安排每一班，让合作划算，也让下一班有钱签约。",
     tags: ["最佳回应", "纳什均衡", "可信承诺", "重复博弈"],
-    chapters: 8,
+    chapters: 16,
     chapterLabel: "章",
     href: "./games/game-theory/",
   },

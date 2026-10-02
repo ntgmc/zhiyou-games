@@ -45,6 +45,8 @@ small, .helper { font-size: var(--text-sm); color: var(--color-muted); }
 .chapter-number { color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .chapter-score { margin-left: auto; font-size: .75rem; }
 .chapter-menu small { display: block; margin-top: var(--space-sm); }
+.chapter-shortcuts { display: grid; gap: var(--space-sm); margin-block: var(--space-sm); }
+.chapter-shortcuts button { font-size: var(--text-sm); }
 .sidebar-tools { display: flex; gap: var(--space-sm); margin-top: var(--space-lg); }
 .sidebar-tools button { flex: 1; font-size: var(--text-sm); }
 .sidebar-tools button span { margin-left: var(--space-sm); }
@@ -59,7 +61,8 @@ main { padding: var(--space-lg) var(--space-md) var(--space-2xl); max-width: 128
 .ledger span { font-size: var(--text-sm); color: var(--color-muted); }
 .ledger strong { display: block; font-size: 1.75rem; line-height: 1.4; font-weight: 500; }
 .ledger small { font-size: var(--text-sm); font-weight: 400; }
-.workspace { display: grid; gap: var(--space-xl); }
+.quota-ledger { font-size: var(--text-sm); padding: var(--space-md); border: 1px solid var(--color-rule); margin-top: calc(-1 * var(--space-md)); }
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xl); }
 .situation > p { color: var(--color-muted); }
 .teaching { padding: var(--space-md); background: var(--color-paper-2); color: var(--color-ink); font-size: var(--text-sm); }
 .teaching strong { display: block; color: var(--color-accent); margin-bottom: var(--space-sm); }

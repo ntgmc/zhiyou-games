@@ -19,6 +19,7 @@ const fmt = (amount: number): string => new Intl.NumberFormat("zh-CN", { maximum
 const signed = (amount: number): string => `${amount > 0 ? "+" : ""}${fmt(amount)}`;
 const persist = (): void => { storageFailed = !writeSave(key, { ...save, draft: validPlan(save.draft) ? save.draft : defaultPlan() }); };
 const guiding = (): boolean => save.mode === "story" && !save.review && guideStep(save.guide, MISSIONS[save.activeId - 1], save.session) !== "dispatch";
+const stage = (id: number): string => id <= 8 ? "入门与迁移" : id <= 12 ? "进阶航线" : "综合值班";
 
 function matrixTable(matrix: Matrix, showEquilibria = false): string {
   return `<table class="payoffs"><caption>左数：白帆（你） · 右数：岑舟 · 单位：金币</caption>
@@ -59,6 +60,7 @@ function navigation(): string {
       <nav aria-label="游戏章节">${MISSIONS.map((mission) => `<button type="button" data-mission="${mission.id}" class="chapter ${mission.id === save.activeId ? "current" : ""}" ${mission.id === save.activeId ? 'aria-current="step"' : ""}>
         <span class="chapter-number">${String(mission.id).padStart(2, "0")}</span><span>${h(mission.title)}</span><span class="chapter-score" aria-label="${save.best[mission.id] ? `${save.best[mission.id]} 星${save.solo[mission.id] ? "，独立通过" : ""}` : "尚未通过"}">${save.best[mission.id] ? `${"★".repeat(save.best[mission.id])}${save.solo[mission.id] ? " ·" : ""}` : "—"}</span>
       </button>`).join("")}</nav>
+      <div class="chapter-shortcuts"><button type="button" data-mission="9">进入进阶航线</button><button type="button" data-mission="13">进入综合值班</button></div>
       <small>可直接进入任意章。切换后从所选章节第一班开始，当前排班进度不保留，已有成绩保留。</small>
     </details>
     <div class="sidebar-tools"><button type="button" data-open="manual">航运手册 <span aria-hidden="true">↗</span></button>${guiding() ? "" : '<button type="button" data-open="lab">博弈实验台 <span aria-hidden="true">↗</span></button>'}</div>
@@ -69,7 +71,7 @@ function conditions(round: Round): string {
   return `<details class="conditions" id="conditions"><summary>查看整章条件与后续订单</summary>
     <div class="table-scroll" tabindex="0" role="region" aria-label="整章订单总表，可横向滚动"><table class="order-table"><caption>整章订单 · 每组收益、周转金与替代航线数字均为你 / 岑舟，单位为金币</caption>
       <thead><tr><th scope="col">班次 / 状态</th><th scope="col">双方错峰</th><th scope="col">各自单独抢先</th><th scope="col">双方抢先</th><th scope="col">周转金</th><th scope="col">每方手续费</th><th scope="col">替代航线</th></tr></thead>
-      <tbody>${mission.rounds.map((item, index) => `<tr><th scope="row">${index + 1}. ${h(item.title)}<small>${index < save.session.history.length ? "已结算" : index === save.session.step ? "当前待排" : "后续订单"}</small></th><td>${item.matrix[0].join(" / ")}</td><td>${item.matrix[2][0]} / ${item.matrix[1][1]}</td><td>${item.matrix[3].join(" / ")}</td><td>${item.reserve.join(" / ")}</td><td>${item.fee}</td><td>${item.outside.join(" / ")}</td></tr>`).join("")}</tbody></table></div>
+      <tbody>${mission.rounds.map((item, index) => `<tr><th scope="row">${index + 1}. ${h(item.title)}<small>${index < save.session.history.length ? "已结算" : index === save.session.step ? "当前待排" : "后续订单"}${item.continuation !== undefined ? ` · 延续 ${item.continuation * 100}%` : ""}</small></th><td>${item.matrix[0].join(" / ")}</td><td>${item.matrix[2][0]} / ${item.matrix[1][1]}</td><td>${item.matrix[3].join(" / ")}</td><td>${item.reserve.join(" / ")}</td><td>${item.fee}</td><td>${item.outside.join(" / ")}</td></tr>`).join("")}</tbody></table></div>
     <p class="helper">表中收益尚未扣合同手续费、没收的保证金或合作分账。未来订单可提前查看，但须按班次执行。</p><div class="forecast">
     ${MISSIONS[save.activeId - 1].rounds.map((item, index) => `<section><h3>${index + 1}. ${h(item.title)}</h3><p>${h(item.briefing)}</p>
       <p class="compact">未扣合同费用时，双方错峰赚 ${item.matrix[0].join(" / ")}；各自单方违约赚 ${item.matrix[2][0]} / ${item.matrix[1][1]}；双方抢先赚 ${item.matrix[3].join(" / ")}。<br>须留运营周转金 ${item.reserve.join(" / ")}；手续费每方 ${item.fee}；替代航线收益 ${item.outside.join(" / ")}。各组数字均为你 / 岑舟。</p>
@@ -111,7 +113,8 @@ function controls(round: Round): string {
     </fieldset>
     <p class="error" id="plan-error" role="alert" tabindex="-1">${h(error)}</p>
     <button type="button" class="primary" data-command="settle">提交并揭晓 <span aria-hidden="true">→</span></button>
-    <p class="helper">金额和现金符合要求就能提交。提交前请检查双方收益，也看看现金够不够安排后面的班次。</p>${hints()}</section>`;
+    ${mission.depositLimit !== undefined ? `<p class="cost-preview">累计担保 ${save.session.deposits} / ${mission.depositLimit}，剩余 ${mission.depositLimit - save.session.deposits}。本班申请金额不能超过剩余；接受才登记，拒签不占用。保证金退回现金，登记额度不恢复。</p>` : ""}
+    <p class="helper">金额、现金${mission.depositLimit !== undefined ? "和剩余担保额度" : ""}符合要求就能提交。提交前请检查双方收益，也看看现金够不够安排后面的班次。</p>${hints()}</section>`;
 }
 function review(): string {
   const session = save.session;
@@ -139,7 +142,7 @@ function review(): string {
       <p>单次互动中，只有不管你选什么，错峰都严格更有利，岑舟才会错峰；否则他会抢先，收益相等也一样。可在实验台查看收益表中的均衡。</p>
     </details>
     ${finished ? `<div class="final-score"><strong>${score ? "★".repeat(score) : "未通过"}</strong><span>${session.hinted ? "本次参考提示" : "本次独立尝试"}${score && !session.hinted ? " · 独立通过" : ""}</span></div>
-      <p>收入目标 ${mission.goal}，实际 ${fmt(session.total[0])}；稳定合作目标 ${mission.cooperation} 班，实际 ${cooperationCount(session)} 班。累计冻结保证金 ${session.deposits} / 效率目标 ${mission.depositTarget}。</p>
+      <p>收入目标 ${mission.goal}，实际 ${fmt(session.total[0])}；稳定合作目标 ${mission.cooperation} 班，实际 ${cooperationCount(session)} 班。累计冻结保证金 ${session.deposits} / 效率目标 ${mission.depositTarget}${mission.depositLimit !== undefined ? `；硬性上限 ${mission.depositLimit}` : ""}。</p>
       <div class="result-actions"><button type="button" data-command="restart">重新排班</button>${score && mission.id < MISSIONS.length ? `<button type="button" class="primary" data-mission="${mission.id + 1}">进入下一章 →</button>` : ""}${score && mission.id === MISSIONS.length ? '<button type="button" data-open="lab">继续做实验</button>' : ""}</div>`
       : `<button type="button" class="primary" data-command="next">安排下一班 →</button>`}
   </section>`;
@@ -155,17 +158,18 @@ function render(): void {
   const learning = guiding();
   app.innerHTML = `${navigation()}<div class="main-shell">
     <header class="topbar"><span>白帆运输 · ${learning ? "港口值班" : mission.concept}</span><button type="button" class="quiet" data-command="mode">${save.mode === "story" ? "打开完整调度桌" : "返回剧情模式"}</button><span>${save.session.hinted ? "参考提示" : "独立尝试"} / 本机存档${storageFailed ? "异常" : "已保存"}</span></header>
-    <main id="desk"><div class="chapter-heading"><div><p class="chapter-kicker">第 ${mission.id} 章 / ${MISSIONS.length}</p><h1>${h(mission.title)}</h1></div><button type="button" class="quiet" data-command="${save.mode === "story" ? "replay" : "restart"}">${save.mode === "story" ? "重看本章剧情" : "重开本章"}</button></div>
+    <main id="desk"><div class="chapter-heading"><div><p class="chapter-kicker">${stage(mission.id)} · 第 ${mission.id} 章 / ${MISSIONS.length}</p><h1>${h(mission.title)}</h1></div><button type="button" class="quiet" data-command="${save.mode === "story" ? "replay" : "restart"}">${save.mode === "story" ? "重看本章剧情" : "重开本章"}</button></div>
       <p class="helper">重看剧情或重开本章会清空本次排班、草稿和练习，从第一班开始；已有星级与独立成绩保留。切换模式保留当前进度。</p>
       ${learning ? renderGuide(save.guide, mission, session, error) : `<p class="introduction">${h(mission.introduction)}</p>
       <div class="ledger"><div><span>白帆可用现金</span><strong>${fmt(session.cash[0])}<small> 金币</small></strong></div><div><span>岑舟可用现金</span><strong>${fmt(session.cash[1])}<small> 金币</small></strong></div>
         <div><span>${repeated ? "长期期望收益" : "累计净收入"}</span><strong>${fmt(session.total[0])}<small> / ${mission.goal}</small></strong></div>
         <div><span>当前班次</span><strong>${step + 1}<small> / ${mission.rounds.length}</small></strong></div></div>
+      ${mission.depositLimit !== undefined ? `<p class="quota-ledger">本章累计担保登记：${session.deposits} / ${mission.depositLimit}，还可登记 ${mission.depositLimit - session.deposits}。三星目标不超过 ${mission.depositTarget}。登记额与现金分开，守约退款不恢复额度。</p>` : ""}
       ${save.review ? review() : `<div class="workspace"><section class="situation"><h2 id="round-title" tabindex="-1">${h(round.title)}</h2><p>${h(round.briefing)}</p>
         ${mission.teaching && save.mode === "desk" ? `<p class="teaching"><strong>何芮的便签</strong>${h(mission.teaching)}</p>` : ""}
         ${harbor(save.draft.action)}
         <div class="objective"><strong>本章交班条件</strong><p>你的${repeated ? "期望" : "净"}收入至少 ${mission.goal}${repeated ? "" : " 金币"}${mission.cooperation ? `，完成 ${mission.cooperation} 班稳定合作。稳定合作要求双方实际错峰，且谁违约都不能赚得更多；单次互动中，守约须严格更有利` : ""}。达到条件得两星；累计冻结保证金不超过 ${mission.depositTarget} 得三星。</p></div>
-        <details class="matrix-detail" id="matrix" ${mission.id <= 2 ? "open" : ""}><summary>${save.draft.contract ? "合同获接受后的净收益表" : "展开双方收益表"}</summary>
+        <details class="matrix-detail" id="matrix" ${mission.id <= 2 || mission.id >= 9 ? "open" : ""}><summary>${save.draft.contract ? "合同获接受后的净收益表" : "展开双方收益表"}</summary>
           ${matrixTable(contractMatrix(round, validPlan(save.draft) ? save.draft : defaultPlan()))}
           <p class="helper">表中显示当班净收益，退还保证金不算收入。${save.draft.contract ? "若岑舟拒签，双方改取替代航线收益，不按这张表结算。" : "没有合同，不扣保证金或手续费。"}</p>
         </details>${conditions(round)}
@@ -176,7 +180,7 @@ function render(): void {
           <span>面对守约的对方，你守约 / 违约 ${fmt(item.cooperation[0])} / ${fmt(item.deviation[0])}；岑舟 ${fmt(item.cooperation[1])} / ${fmt(item.deviation[1])}。</span>
           <details><summary>回看本班原始条件与签约结果</summary><p>${h(mission.rounds[index].briefing)}</p><p>签约前须留周转金 ${mission.rounds[index].reserve.join(" / ")}，每方手续费 ${mission.rounds[index].fee}；替代航线收入 ${mission.rounds[index].outside.join(" / ")}。各组数字为你 / 岑舟，单位为金币。</p>${matrixTable(mission.rounds[index].matrix)}<p>${h(item.reason)}</p></details></div>`).join("") : "<p>还没有靠港记录。提交排班后，这里会保留双方行动、合同与收益。</p>"}
       </details>`}
-    </main><footer>潮汐港：合约与对手 <span>当前版本：8 章入门与独立练习</span></footer></div>`;
+    </main><footer>潮汐港：合约与对手 <span>${stage(mission.id)}</span></footer></div>`;
   for (const item of app.querySelectorAll<HTMLDetailsElement>("details[id]")) if (detailStates.has(item.id)) item.open = detailStates.get(item.id)!;
   if (focusId) document.getElementById(focusId)?.focus({ preventScroll: true });
 }
@@ -217,7 +221,25 @@ function updateInput(event: Event): void {
 }
 const numericFields = ["deposit", "transfer", "guide-deposit", "guide-transfer"];
 app.addEventListener("input", (event) => {
-  if (event.target instanceof HTMLInputElement && numericFields.includes(event.target.id)) updateInput(event);
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || !numericFields.includes(input.id)) return;
+  if (input.value === "" || input.validity.badInput) {
+    if (input.id === "guide-deposit") save.guide.deposit = NaN;
+    else if (input.id === "guide-transfer") save.guide.transfer = NaN;
+    else if (input.id === "deposit") save.draft.deposit = NaN;
+    else save.draft.transfer = NaN;
+    error = "请填入范围内的整数，再试算或提交。";
+    const feedback = document.getElementById(guiding() ? "guide-error" : "plan-error");
+    if (feedback) feedback.textContent = error;
+    if (guiding()) {
+      save.guide.tested = false;
+      app.querySelector<HTMLButtonElement>('[data-command="guide-next"]')!.disabled = true;
+      app.querySelector(".experiment-result")?.remove();
+    }
+    persist();
+    return;
+  }
+  updateInput(event);
 });
 app.addEventListener("change", (event) => {
   if (event.target instanceof HTMLInputElement && numericFields.includes(event.target.id)) return;
