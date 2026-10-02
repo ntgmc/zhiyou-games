@@ -116,7 +116,7 @@ function renderConsole() {
       <main class="main">
         <header class="topbar">
           <div class="breadcrumb"><span>任务控制台</span>${icon("chevron")}<strong>航段 ${String(mission.id).padStart(2, "0")}</strong></div>
-          <div class="topbar-right"><button class="text-button" data-action="story-mode">返回剧情引导</button>${musicButton()}<span class="local-badge"><span class="status-dot"></span>本地模拟</span><button class="icon-button" data-action="help" aria-label="玩法说明" title="玩法说明">${icon("info")}</button></div>
+          <div class="topbar-right"><button class="text-button" data-action="story-mode">返回剧情引导</button>${musicButton()}<button class="icon-button" data-action="help" aria-label="玩法说明" title="玩法说明">${icon("info")}</button></div>
         </header>
         <div class="main-content">
           <section class="hero">
@@ -208,7 +208,7 @@ function renderConsole() {
               </div>
             </aside>
           </div>
-          <footer class="workspace-footer"><span><span class="status-dot"></span>所有编码、干扰和解码均在本地计算</span><div><button class="text-button muted" data-action="restart">${icon("reset")}重新开始本关</button>${mission.rounds > 1 && session.status === "playing" ? '<button class="text-button muted" data-action="wait">跳过本轮 →</button>' : ""}</div></footer>
+          <footer class="workspace-footer"><div><button class="text-button muted" data-action="restart">${icon("reset")}重新开始本关</button>${mission.rounds > 1 && session.status === "playing" ? '<button class="text-button muted" data-action="wait">跳过本轮 →</button>' : ""}</div></footer>
         </div>
       </main>
     </div>`;

@@ -176,7 +176,7 @@ function render(): void {
           <span>面对守约的对方，你守约 / 违约 ${fmt(item.cooperation[0])} / ${fmt(item.deviation[0])}；岑舟 ${fmt(item.cooperation[1])} / ${fmt(item.deviation[1])}。</span>
           <details><summary>回看本班原始条件与签约结果</summary><p>${h(mission.rounds[index].briefing)}</p><p>签约前须留周转金 ${mission.rounds[index].reserve.join(" / ")}，每方手续费 ${mission.rounds[index].fee}；替代航线收入 ${mission.rounds[index].outside.join(" / ")}。各组数字为你 / 岑舟，单位为金币。</p>${matrixTable(mission.rounds[index].matrix)}<p>${h(item.reason)}</p></details></div>`).join("") : "<p>还没有靠港记录。提交排班后，这里会保留双方行动、合同与收益。</p>"}
       </details>`}
-    </main><footer>潮汐港：合约与对手 <span>当前版本：8 章入门与独立练习 · 本地计算 · 无需注册</span></footer></div>`;
+    </main><footer>潮汐港：合约与对手 <span>当前版本：8 章入门与独立练习</span></footer></div>`;
   for (const item of app.querySelectorAll<HTMLDetailsElement>("details[id]")) if (detailStates.has(item.id)) item.open = detailStates.get(item.id)!;
   if (focusId) document.getElementById(focusId)?.focus({ preventScroll: true });
 }

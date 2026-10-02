@@ -88,7 +88,6 @@ h1, h2, h3, p { margin: 0; }
 .breadcrumb .icon { width: 12px; height: 12px; color: #4f6775; }
 .breadcrumb strong { font-weight: 400; color: #b9c8cf; }
 .topbar-right { display: flex; align-items: center; gap: 18px; }
-.local-badge { display: flex; align-items: center; gap: 7px; font-size: 10px; color: #9cafb6; }
 .icon-button { background: transparent; display: grid; place-items: center; width: 30px; height: 30px; color: #819aa8; border-radius: 5px; }
 .icon-button:hover { background: #20343f; color: var(--text); }
 .icon-button .icon { width: 17px; height: 17px; }
@@ -276,9 +275,7 @@ h1 { font-size: clamp(23px, 2.2vw, 33px); font-weight: 600; letter-spacing: 1px;
 .hint-heading button { margin-left: auto; }
 .hint-card p { color: #9bacad; font-size: 9px; margin: 9px 0; line-height: 1.9; }
 .hint-card .text-button { color: #bfcca3; }
-.workspace-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #617f90; margin-top: 19px; padding: 0 2px; font-size: 8px; }
-.workspace-footer > span { display: flex; align-items: center; gap: 6px; }
-.workspace-footer .status-dot { width: 4px; height: 4px; background: #668f82; }
+.workspace-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; color: #617f90; margin-top: 19px; padding: 0 2px; font-size: 8px; }
 .workspace-footer > div { display: flex; align-items: center; gap: 20px; }
 .workspace-footer .text-button { font-size: 8px; }
 .workspace-footer .icon { width: 11px; height: 11px; }
