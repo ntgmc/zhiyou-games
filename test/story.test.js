@@ -26,6 +26,21 @@ test("the first lesson introduces one action at a time and prevents sending earl
   assert.equal(storyCanSend(next, mission), false);
 });
 
+test("the early lessons explain the shared lookup table and savings before optional theory", () => {
+  const first = STORY[1].steps.find(({ action }) => action === "demo");
+  assert.match(first.text, /一位 0 或 1.*比特/);
+  assert.match(first.text, /对照表.*码本/);
+  assert.match(STORY[1].learning, /码字是一条指令/);
+  assert.match(STORY[2].steps.find(({ action }) => action === "tree").text, /分组.*0、1.*新写法/);
+  assert.match(STORY[2].learning, /32 位降到 28 位/);
+  assert.match(STORY[3].learning, /32 位缩短到 25 位/);
+  for (const id of [1, 2, 3]) {
+    for (const step of STORY[id].steps) {
+      assert.doesNotMatch(step.text, /信息熵|理论下界|平均不确定性|权重|叶子|根节点/);
+    }
+  }
+});
+
 test("reloading keeps a tutorial step while migrated games resume without replaying completed actions", () => {
   const mission = MISSIONS[0];
   const session = createSession(mission);

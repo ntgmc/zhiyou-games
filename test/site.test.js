@@ -8,11 +8,13 @@ import { MISSIONS } from "../.build/src/games/information/missions.js";
 import { createTree, mergeTree, renderTree } from "../.build/src/games/information/tree.js";
 import { renderLab } from "../.build/src/games/information/lab.js";
 import { storyResult, detailedResult } from "../.build/src/games/information/results.js";
+import { MISSIONS as HARBOR_MISSIONS } from "../.build/src/games/game-theory/missions.js";
 
 test("each catalog entry has an independent static page and game code stays outside the home entry", async () => {
   assert.ok(GAMES.length);
   assert.equal(new Set(GAMES.map(({ id }) => id)).size, GAMES.length);
   assert.equal(GAMES.find(({ id }) => id === "information").chapters, MISSIONS.length);
+  assert.equal(GAMES.find(({ id }) => id === "game-theory").chapters, HARBOR_MISSIONS.length);
   for (const game of GAMES) {
     assert.match(game.href, /^\.\/games\/[a-z][a-z0-9-]*\/$/);
     const html = await readFile(new URL(`../${game.href}index.html`, import.meta.url), "utf8");
@@ -45,7 +47,7 @@ test("the relocated game restores version-one progress and current sessions", ()
 test("extracted tree and correction workshops keep their teaching behavior", () => {
   const counts = { A: 8, B: 4, C: 2, D: 2 };
   const tree = createTree(counts);
-  assert.match(renderTree(tree, counts, true), /现在最小的两个权重是 2 和 2/);
+  assert.match(renderTree(tree, counts, true), /右转” 2 次和“停止” 2 次/);
   mergeTree(tree);
   assert.equal(tree.forest.length, 4, "an incomplete selection does not merge");
   while (tree.forest.length > 1) {

@@ -327,6 +327,7 @@ h1 { font-size: clamp(23px, 2.2vw, 33px); font-weight: 600; letter-spacing: 1px;
 .forest-node { position: relative; display: flex; flex-direction: column; align-items: center; width: 128px; min-height: 131px; border: 1px solid #3b5a63; background: #142c35; border-radius: 7px; padding: 14px 7px 11px; }
 .forest-node.selected { border-color: var(--mint); background: #1c3d34; box-shadow: 0 0 0 2px #83e8c514; }
 .node-weight { font-size: 26px; color: #b3dacc; }
+.node-weight small { margin-left: 4px; }
 .forest-node strong { font-size: 11px; font-weight: 500; margin-top: 4px; }
 .forest-node small { font-size: 8px; color: #86a7b0; margin-top: 5px; }
 .node-order { position: absolute; top: -9px; background: var(--mint); color: #102b23; border-radius: 3px; padding: 1px 5px; font-size: 8px; }
@@ -339,6 +340,14 @@ h1 { font-size: clamp(23px, 2.2vw, 33px); font-weight: 600; letter-spacing: 1px;
 .generated-codes > div { background: #162e34; border: 1px solid #31524f; border-radius: 5px; padding: 10px; text-align: center; }
 .generated-codes span { display: block; font-size: 10px; color: #91b1b2; }
 .generated-codes strong { display: block; font-size: 18px; color: var(--mint); letter-spacing: 2px; font-weight: 400; margin-top: 4px; }
+.generated-codes small { display: block; color: #91b1b2; font-size: 10px; margin-top: 6px; }
+.tree-preview { margin-top: 18px; padding: 16px; border: 1px solid #31524f; border-radius: 6px; background: #10272c; text-align: center; }
+.tree-preview > strong { color: #b8d8ca; font-size: 12px; font-weight: 500; }
+.tree-preview .code-tree-svg { width: min(100%, 320px); max-height: 180px; margin: 14px auto; }
+.tree-preview + .tree-mentor-note { margin-top: 18px; }
+.tree-preview p { color: var(--mint); font-size: 12px; line-height: 1.9; }
+.tree-preview > small { display: block; margin-top: 8px; color: #91b1b2; font-size: 11px; line-height: 1.9; }
+.tree-metrics { color: #91b1b2; font-size: 12px; margin-top: 14px; }
 .small-formula { font-size: 12px; padding: 12px; margin: 14px 0 0; }
 .lab-modal { width: min(100%, 720px); }
 .lab-data { display: flex; align-items: center; gap: 14px; margin: 22px 0; }
@@ -524,7 +533,7 @@ h1 { font-size: clamp(23px, 2.2vw, 33px); font-weight: 600; letter-spacing: 1px;
 .demo-commands .chosen { background: #244739; border-color: #77b49a; }
 .demo-commands .symbol-dot { width: 30px; height: 30px; font-size: 19px; }
 .demo-commands .symbol-dot.pink { font-size: 12px; }
-.encode-demo { margin: 26px 0 14px; background: #0d1e29; border: 1px solid #2e4b56; border-radius: 6px; min-height: 112px; display: flex; align-items: center; justify-content: center; gap: 29px; }
+.encode-demo { margin: 26px 0 14px; background: #0d1e29; border: 1px solid #2e4b56; border-radius: 6px; min-height: 112px; display: flex; align-items: center; justify-content: center; gap: clamp(8px, 2vw, 20px); }
 .demo-message { display: flex; flex-direction: column; align-items: center; font-size: 29px; color: #bbdfd2; }
 .demo-message small { font-size: 10px; color: #83a9aa; }
 .encode-demo > .icon { color: #507b83; width: 19px; height: 19px; }
@@ -537,11 +546,6 @@ h1 { font-size: clamp(23px, 2.2vw, 33px); font-weight: 600; letter-spacing: 1px;
 .story-frequency strong { font-size: 11px; font-weight: 400; color: #b3cbd3; }
 .story-frequency .frequency-track { height: 7px; margin-left: 8px; }
 .story-frequency > div > :last-child { width: 33px; font-size: 10px; text-align: right; color: #a8c9c9; }
-.story-learning-number { border: 1px solid #2d514c; background: #152f2b; border-radius: 6px; padding: 18px; margin-top: 20px; }
-.story-learning-number > span { font-size: 10px; color: #9bb9ad; }
-.story-learning-number strong { display: block; font-family: var(--mono); font-size: 25px; font-weight: 400; color: #b9e8d3; margin-top: 6px; }
-.story-learning-number small { font-family: var(--font); color: #779b8e; font-size: 10px; }
-.story-learning-number p { color: #8eb2a6; font-size: 10px; margin-top: 7px; margin-bottom: 9px; }
 .tree-intro, .lab-intro { background: #0d202b; border: 1px solid #2d4753; border-radius: 6px; padding: 26px 15px; text-align: center; }
 .tree-intro-nodes { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 24px; }
 .tree-intro-nodes > span { border: 1px solid #4b6974; background: #1c3440; border-radius: 50%; display: grid; place-items: center; width: 47px; height: 47px; font-family: var(--mono); font-size: 21px; color: #bfd3de; }
