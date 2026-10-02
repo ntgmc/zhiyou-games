@@ -49,6 +49,14 @@ async function verify() {
     throw new Error("The probability game page or its canonical URL is missing.");
   }
   const repairAppUrl = new URL(repairModule, repairUrl);
+  const networkUrl = new URL("games/network/", site);
+  const networkHtml = await (await get(networkUrl)).text();
+  const networkModule = networkHtml.match(/src="([^"]+\/src\/games\/network\/app\.js)"/)?.[1];
+  const networkCss = networkHtml.match(/href="([^"]+\/src\/games\/network\/game\.css)"/)?.[1];
+  if (!networkModule || !networkCss || !networkHtml.includes(`rel="canonical" href="${networkUrl.href}"`)) {
+    throw new Error("The network game page or its canonical URL is missing.");
+  }
+  const networkAppUrl = new URL(networkModule, networkUrl);
   const checks = [
     [appUrl, /(?:javascript|ecmascript)/],
     [cssUrl, /text\/css/],
@@ -62,6 +70,9 @@ async function verify() {
     [repairAppUrl, /(?:javascript|ecmascript)/],
     [new URL(repairCss, repairUrl), /text\/css/],
     ...["engine", "missions", "storage", "story", "results"].map((name) => [new URL(`./${name}.js`, repairAppUrl), /(?:javascript|ecmascript)/]),
+    [networkAppUrl, /(?:javascript|ecmascript)/],
+    [new URL(networkCss, networkUrl), /text\/css/],
+    ...["engine", "missions", "storage", "story"].map((name) => [new URL(`./${name}.js`, networkAppUrl), /(?:javascript|ecmascript)/]),
     [new URL("../../assets/share-card.png", appUrl), /image\/png/],
     ...["orbit", "code", "storm", "arrival"].map((id) =>
       [new URL(`../../../assets/music/${id}.mp3`, gameAppUrl), /^audio\/(?:mpeg|mp3)(?:;|$)/]),
