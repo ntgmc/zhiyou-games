@@ -9,12 +9,14 @@ import { createTree, mergeTree, renderTree } from "../.build/src/games/informati
 import { renderLab } from "../.build/src/games/information/lab.js";
 import { storyResult, detailedResult } from "../.build/src/games/information/results.js";
 import { MISSIONS as HARBOR_MISSIONS } from "../.build/src/games/game-theory/missions.js";
+import { MISSIONS as REPAIR_MISSIONS } from "../.build/src/games/probability/missions.js";
 
 test("each catalog entry has an independent static page and game code stays outside the home entry", async () => {
   assert.ok(GAMES.length);
   assert.equal(new Set(GAMES.map(({ id }) => id)).size, GAMES.length);
   assert.equal(GAMES.find(({ id }) => id === "information").chapters, MISSIONS.length);
   assert.equal(GAMES.find(({ id }) => id === "game-theory").chapters, HARBOR_MISSIONS.length);
+  assert.equal(GAMES.find(({ id }) => id === "probability").chapters, REPAIR_MISSIONS.length);
   for (const game of GAMES) {
     assert.match(game.href, /^\.\/games\/[a-z][a-z0-9-]*\/$/);
     const html = await readFile(new URL(`../${game.href}index.html`, import.meta.url), "utf8");

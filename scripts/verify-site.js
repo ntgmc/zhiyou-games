@@ -41,6 +41,14 @@ async function verify() {
     throw new Error("The game theory page or its canonical URL is missing.");
   }
   const harborAppUrl = new URL(harborModule, harborUrl);
+  const repairUrl = new URL("games/probability/", site);
+  const repairHtml = await (await get(repairUrl)).text();
+  const repairModule = repairHtml.match(/src="([^"]+\/src\/games\/probability\/app\.js)"/)?.[1];
+  const repairCss = repairHtml.match(/href="([^"]+\/src\/games\/probability\/game\.css)"/)?.[1];
+  if (!repairModule || !repairCss || !repairHtml.includes(`rel="canonical" href="${repairUrl.href}"`)) {
+    throw new Error("The probability game page or its canonical URL is missing.");
+  }
+  const repairAppUrl = new URL(repairModule, repairUrl);
   const checks = [
     [appUrl, /(?:javascript|ecmascript)/],
     [cssUrl, /text\/css/],
@@ -51,6 +59,9 @@ async function verify() {
     [new URL(harborCss, harborUrl), /text\/css/],
     [new URL(harborTokens, harborUrl), /text\/css/],
     ...["engine", "missions", "storage"].map((name) => [new URL(`./${name}.js`, harborAppUrl), /(?:javascript|ecmascript)/]),
+    [repairAppUrl, /(?:javascript|ecmascript)/],
+    [new URL(repairCss, repairUrl), /text\/css/],
+    ...["engine", "missions", "storage", "story"].map((name) => [new URL(`./${name}.js`, repairAppUrl), /(?:javascript|ecmascript)/]),
     [new URL("../../assets/share-card.png", appUrl), /image\/png/],
     ...["orbit", "code", "storm", "arrival"].map((id) =>
       [new URL(`../../../assets/music/${id}.mp3`, gameAppUrl), /^audio\/(?:mpeg|mp3)(?:;|$)/]),
