@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { analyze, binomial, defaultPlan, deviceProbability, execute, missionError, planError, sampleObservations, samplePosterior, update } from "../.build/src/games/probability/engine.js";
 import { MISSIONS, PRECISE, SCREEN } from "../.build/src/games/probability/missions.js";
-import { advanceGuide, freshGuide, guideAction, guideLength, guideReady, guideStep, readGuide, renderGuide } from "../.build/src/games/probability/story.js";
+import { advanceGuide, freshGuide, guideAction, guideLength, guideReady, guideStep, readGuide, renderGuide, renderHints } from "../.build/src/games/probability/story.js";
+import { renderResult } from "../.build/src/games/probability/results.js";
 import { freshSave, readSave, recordScore, startChapter, writeSave } from "../.build/src/games/probability/storage.js";
 
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
@@ -219,4 +220,45 @@ test("save roundtrip rebuilds outcomes, keeps achievements and isolates test pro
   assert.deepEqual(readSave("invalid", storage), freshSave());
   storage.setItem("invalid", JSON.stringify({ ...save, version: 999 }));
   assert.deepEqual(readSave("invalid", storage), freshSave());
+});
+
+test("settlement explains average scoring and itemizes the actual costs without changing outcomes", () => {
+  for (const mission of MISSIONS) {
+    for (const plans of [mission.reference, mission.cases.map(defaultPlan)]) {
+      const result = execute(mission, plans);
+      const html = renderResult(mission, plans, result, false, mission.id === 8);
+      let replacement = 0;
+      let faults = 0;
+      result.outcomes.forEach((outcome, i) => {
+        const job = mission.cases[i];
+        if (outcome.action === "replace") replacement += (job.kind === "batch" ? job.count : 1) * job.replaceCost;
+        else faults += outcome.faults * job.faultLoss;
+      });
+      close(result.cost + replacement + faults, result.actual);
+      const format = (n) => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(n);
+      assert.ok(html.includes(`${format(result.cost)} 点调查费 + ${format(replacement)} 点更换费 + ${format(faults)} 点故障损失`));
+      assert.ok(html.includes(`平均损失 ${format(result.expected)} 点计算`));
+      assert.ok(html.indexOf("return-list") < html.indexOf("本章笔记"));
+      assert.ok(html.indexOf("本章笔记") < html.indexOf("评分用的平均损失"));
+      assert.ok(!html.includes("单次结果不决定方案成绩"));
+      assert.ok(html.includes(result.passed ? "这份方案通过了" : "再调整一下方案"));
+    }
+  }
+});
+
+test("hint entry is compact and opening it displays the first hint without exposing later answers", () => {
+  const mission = MISSIONS[7];
+  const collapsed = renderHints(mission, 0, false);
+  assert.ok(collapsed.includes('aria-expanded="false"'));
+  assert.ok(!collapsed.includes("hint-content"));
+  assert.ok(!collapsed.includes(mission.hints[0]));
+  const first = renderHints(mission, 1, true);
+  assert.ok(first.includes('aria-expanded="true"'));
+  assert.ok(first.includes(mission.hints[0]));
+  assert.ok(!first.includes(mission.hints[1]));
+  assert.ok(!first.includes(mission.hints[2]));
+  assert.ok(first.includes("查看关键条件"));
+  const complete = renderHints(mission, 3, true);
+  mission.hints.forEach((hint) => assert.ok(complete.includes(hint)));
+  assert.ok(!complete.includes('data-command="hint-next"'));
 });

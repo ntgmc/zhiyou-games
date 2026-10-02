@@ -24,7 +24,7 @@ export function freshSave(): Save {
 }
 export function startChapter(save: Save, id: number): void {
   const mission = MISSIONS.find((item) => item.id === id);
-  if (!mission) throw new Error("章节不存在。");
+  if (!mission) throw new Error("找不到这一章，请从章节列表重新选择。");
   save.activeId = id;
   save.plans = mission.cases.map(defaultPlan);
   save.guide = freshGuide();
