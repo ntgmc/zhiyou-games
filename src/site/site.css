@@ -62,6 +62,14 @@ h2 { font-size: 28px; font-weight: 500; margin-top: 7px; text-wrap: balance; }
 .repair-cover { flex: 1; align-self: center; width: 82%; margin: 22px 0; padding: 16px; background: #fffcf2; border: 1px solid #c0b69d; border-top: 8px solid #6c826c; transform: rotate(-3deg); }
 .repair-cover > span { font-size: 12px; }.repair-cover small { font-size: 10px; color: #6c7866; }
 .repair-cells { font: 28px/1.7 monospace; color: #6c826c; margin: 14px 0; white-space: nowrap; }
+.game-art.network-art { background: #e5e9d8; color: #334f43; }
+.network-art .art-label > span, .network-art .art-caption > span { color: #60745e; }
+.network-cover { flex: 1; display: grid; place-items: center; }
+.network-cover svg { width: 100%; max-width: 350px; }
+.network-cover .cover-hills { fill: none; stroke: #cbd7bb; stroke-width: 30; stroke-linejoin: round; }
+.network-cover .cover-roads { fill: none; stroke: #668572; stroke-width: 3; }
+.network-cover circle { fill: #fafbef; stroke: #315a41; stroke-width: 3; }
+.network-cover text { fill: #466044; font-size: 11px; }
 .game-art { background: #102630; color: #c5dcd8; min-height: 330px; display: flex; flex-direction: column; padding: 24px; position: relative; overflow: hidden; }
 .art-label { display: flex; justify-content: space-between; font: 9px Consolas, monospace; letter-spacing: 1.5px; z-index: 1; }
 .art-label > span { color: #7aa69c; }
@@ -86,7 +94,6 @@ h3 { font-size: 30px; font-weight: 500; margin: 17px 0 12px; }
 .game-bottom > span { color: var(--muted); font-size: 11px; }
 .play-link { font-size: 13px; color: var(--green); white-space: nowrap; }
 .play-link > span { margin-left: 12px; }
-.catalog-note { margin-top: 18px; color: var(--muted); font-size: 11px; }
 .about { padding: 10px 0 58px; display: grid; grid-template-columns: 1fr 1.8fr; gap: 60px; }
 .about h2 { font-size: 24px; }
 .about p { color: var(--muted); font-size: 13px; line-height: 2; margin-top: 10px; }

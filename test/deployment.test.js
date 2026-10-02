@@ -26,6 +26,9 @@ test("publish builds contain only public files, keep subpath imports valid and a
   const repairHtml = await readFile(resolve(publishRoot, "games/probability/index.html"), "utf8");
   assert.match(repairHtml, new RegExp(`\\.\\./\\.\\./${build.release}/src/games/probability/app\\.js`));
   assert.match(repairHtml, /rel="canonical" href="https:\/\/example\.com\/zhiyou-games\/games\/probability\/"/);
+  const networkHtml = await readFile(resolve(publishRoot, "games/network/index.html"), "utf8");
+  assert.match(networkHtml, new RegExp(`\\.\\./\\.\\./${build.release}/src/games/network/app\\.js`));
+  assert.match(networkHtml, /rel="canonical" href="https:\/\/example\.com\/zhiyou-games\/games\/network\/"/);
   for (const file of ["orbit", "code", "storm", "arrival"]) {
     assert.ok((await readFile(resolve(publishRoot, build.release, `assets/music/${file}.mp3`))).length > 100000);
   }
@@ -96,6 +99,21 @@ test("publish builds contain only public files, keep subpath imports valid and a
     const repairRedirect = await fetch(`${base}/zhiyou-games/games/probability?test=1`, { redirect: "manual" });
     assert.equal(repairRedirect.headers.get("location"), "/zhiyou-games/games/probability/?test=1");
     assert.equal((await fetch(`${repairUrl}?test=1`)).status, 200, "the repair game supports direct reloads");
+    const networkUrl = `${base}/zhiyou-games/games/network/`;
+    const networkPage = await fetch(`${networkUrl}?test=1`);
+    assert.equal(networkPage.status, 200);
+    const networkPageHtml = await networkPage.text();
+    for (const path of [...networkPageHtml.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map((match) => match[1])) {
+      const resource = await fetch(new URL(path, networkUrl));
+      assert.equal(resource.status, 200);
+      assert.match(resource.headers.get("content-type"), path.endsWith(".css") ? /text\/css/ : /javascript/);
+    }
+    const networkModuleUrl = new URL(networkPageHtml.match(/src="([^"]+app\.js)"/)[1], networkUrl);
+    for (const name of ["engine", "missions", "story", "storage"]) {
+      assert.equal((await fetch(new URL(`./${name}.js`, networkModuleUrl))).status, 200);
+    }
+    const networkRedirect = await fetch(`${base}/zhiyou-games/games/network?test=1`, { redirect: "manual" });
+    assert.equal(networkRedirect.headers.get("location"), "/zhiyou-games/games/network/?test=1");
     const song = await fetch(`${base}/zhiyou-games/${build.release}/assets/music/orbit.mp3`, { method: "HEAD" });
     assert.equal(song.status, 200);
     assert.equal(song.headers.get("content-type"), "audio/mpeg");

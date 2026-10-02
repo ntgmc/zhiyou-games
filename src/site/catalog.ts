@@ -39,4 +39,14 @@ export const GAMES: readonly GameEntry[] = [
     chapterLabel: "章",
     href: "./games/probability/",
   },
+  {
+    id: "network",
+    title: "山城补给网",
+    subject: "图论与网络优化",
+    description: "暴雨后的街区正在等补给。选择路线、分配道路容量，修改尚未发出的调度单，找出限制整个路网的通道，把物资送到各个接收站。",
+    tags: ["最短路径", "最大流", "残量网络", "最小割"],
+    chapters: 8,
+    chapterLabel: "章",
+    href: "./games/network/",
+  },
 ];
