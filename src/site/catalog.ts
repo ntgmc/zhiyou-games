@@ -23,7 +23,7 @@ export const GAMES: readonly GameEntry[] = [
     id: "game-theory",
     title: "潮汐港：合约与对手",
     subject: "博弈论",
-    description: "经营白帆运输，与另一支船队共享港口。推演对手的收益，制定保证金与分账合同，在有限现金中交出稳定合作的排班表。",
+    description: "你和岑舟共用一条航道，谁都想早点靠港。比较双方收益，定好保证金和分账，用手里的现金安排每一班，让合作划算，也让下一班有钱签约。",
     tags: ["最佳回应", "纳什均衡", "可信承诺", "重复博弈"],
     chapters: 8,
     chapterLabel: "章",

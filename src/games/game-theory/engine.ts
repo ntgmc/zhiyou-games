@@ -74,14 +74,14 @@ export function validPlan(value: unknown): value is Plan {
 }
 export function planError(session: Session, mission: Mission, plan: Plan): string | null {
   if (!validPlan(plan)) return "保证金须为 0～12 的整数，分账须为 −4～4 的整数。";
-  if (session.missionId !== mission.id || session.status !== "playing" || !mission.rounds[session.step]) return "当前航段已经结算，请重新尝试或进入下一章。";
+  if (session.missionId !== mission.id || session.status !== "playing" || !mission.rounds[session.step]) return "当前排班已结束，请重开本章或进入下一章。";
   const round = mission.rounds[session.step];
   if (plan.contract && (!mission.contracts || round.continuation !== undefined)) return "当前任务没有港务处合同，请取消合同选项。";
   if (!plan.contract && (plan.deposit !== 0 || plan.transfer !== 0)) return "保证金与分账需要先启用合同。";
   if (plan.transfer !== 0 && !mission.transfers) return "本章尚未开放合作分账。";
-  if (plan.reciprocal && round.continuation === undefined) return "这一航段有明确终点，不能使用无限期合作方案。";
+  if (plan.reciprocal && round.continuation === undefined) return "本章有明确终点，不能采用无限期的长期互惠方案。";
   if (plan.contract && session.cash[0] < plan.deposit + round.fee + round.reserve[0]) {
-    return `你需要 ${plan.deposit + round.fee + round.reserve[0]} 金币（保证金 ${plan.deposit} + 手续费 ${round.fee} + 运营周转 ${round.reserve[0]}），目前只有 ${session.cash[0]}。降低保证金或重排方案。`;
+    return `签约时你需要 ${plan.deposit + round.fee + round.reserve[0]} 金币（保证金 ${plan.deposit} + 手续费 ${round.fee} + 运营周转 ${round.reserve[0]}），目前只有 ${session.cash[0]}。请降低保证金或重新排班，周转金须留在账上，不会扣除。`;
   }
   return null;
 }
@@ -96,9 +96,9 @@ export function analyze(round: Round, cash: Pair, plan: Plan): Analysis {
   const accepted = plan.contract && cash[1] >= plan.deposit + round.fee + round.reserve[1]
     && round.matrix[0][1] + plan.transfer - round.fee >= round.outside[1];
   const reason = !plan.contract ? "双方没有签署港务处合同。"
-    : cash[1] < plan.deposit + round.fee + round.reserve[1] ? "岑舟拒签：冻结保证金后，运营周转资金不足。"
-    : !accepted ? `岑舟拒签：守约净赚 ${round.matrix[0][1] + plan.transfer - round.fee}，另走航线能赚 ${round.outside[1]}。`
-    : "岑舟接受：守约收益不低于替代航线，资金也足够。";
+    : cash[1] < plan.deposit + round.fee + round.reserve[1] ? "岑舟拒签：冻结保证金、付完手续费后，剩余运营资金不足。"
+    : !accepted ? `岑舟拒签：双方守约时他净赚 ${round.matrix[0][1] + plan.transfer - round.fee}，走替代航线能赚 ${round.outside[1]}。`
+    : "岑舟接受：双方守约的净收益不低于替代航线，他也有足够的现金签约。";
   const matrix = contractMatrix(round, accepted ? plan : defaultPlan());
   const p = plan.reciprocal ? round.continuation ?? 0 : 0;
   const cooperation: Pair = [matrix[0][0] / (1 - p), matrix[0][1] / (1 - p)];
