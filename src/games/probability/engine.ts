@@ -95,7 +95,7 @@ export const actionName = (action: Action): string => action === "keep" ? "保�
 export const probability = (value: number): boolean => Number.isFinite(value) && value >= 0 && value <= 1;
 
 export function update(prior: number, sensitivity: number, falseAlarm: number, red: boolean): { chance: number; fault: number } {
-  if (![prior, sensitivity, falseAlarm].every(probability)) throw new Error("概率须在 0 与 1 之间。");
+  if (![prior, sensitivity, falseAlarm].every(probability)) throw new Error("概率必须在 0 到 1 之间，例如 20% 写成 0.2。");
   const faultPart = prior * (red ? sensitivity : 1 - sensitivity);
   const normalPart = (1 - prior) * (red ? falseAlarm : 1 - falseAlarm);
   const chance = faultPart + normalPart;
@@ -109,11 +109,11 @@ export function deviceProbability(job: Device): number {
   for (const report of job.evidence) {
     const previous = seen.get(report.source);
     if (previous) {
-      if (previous.red !== report.red || previous.detector.id !== report.detector.id) throw new Error("同一测量的报告互相矛盾。");
+      if (previous.red !== report.red || previous.detector.id !== report.detector.id) throw new Error("同一编号的报告，检测器或结果不同，内容互相矛盾。请核对来源。");
       continue;
     }
     const next = update(fault, report.detector.sensitivity, report.detector.falseAlarm, report.red);
-    if (next.chance === 0) throw new Error("报告与当前模型不相容。");
+    if (next.chance === 0) throw new Error("按这台检测器的参数，这个报告结果不可能出现。请核对报告。");
     fault = next.fault;
     seen.set(report.source, report);
   }
@@ -121,14 +121,14 @@ export function deviceProbability(job: Device): number {
 }
 
 export function binomial(n: number, k: number, rate: number): number {
-  if (!Number.isInteger(n) || !Number.isInteger(k) || n < 0 || k < 0 || k > n || !probability(rate)) throw new Error("无效的取样参数。");
+  if (!Number.isInteger(n) || !Number.isInteger(k) || n < 0 || k < 0 || k > n || !probability(rate)) throw new Error("取样数量必须是非负整数，坏件数不能超过样品数，故障率须在 0 到 1 之间。");
   let combinations = 1;
   for (let i = 1; i <= k; i++) combinations *= (n - i + 1) / i;
   return combinations * rate ** k * (1 - rate) ** (n - k);
 }
 
 export function samplePosterior(job: Batch, n: number, k: number): { chance: number; weights: number[]; fault: number } {
-  if (n > job.maxSamples) throw new Error("样本数超过本批上限。");
+  if (n > job.maxSamples) throw new Error(`这批最多能检查 ${job.maxSamples} 件样品。`);
   const parts = job.rates.map((rate, i) => job.weights[i] * binomial(n, k, rate));
   const chance = parts.reduce((a, b) => a + b, 0);
   const weights = chance === 0 ? [...job.weights] : parts.map((part) => part / chance);
@@ -145,12 +145,12 @@ export function validPlan(value: unknown): value is Plan {
 }
 
 export function planError(job: Case, plan: Plan): string | null {
-  if (!validPlan(plan)) return "方案格式无效，请重新选择检测和处置。";
+  if (!validPlan(plan)) return "方案格式有误，请重新选择检测和处理方式。";
   if (job.kind === "device") {
-    if (plan.samples !== 0 || plan.cutoff !== 1) return "单台设备不使用批次取样设置。";
+    if (plan.samples !== 0 || plan.cutoff !== 1) return "这是单台设备，请选检测器，不需要设置取样数量。";
     if (plan.detectorId && !job.detectors.some((detector) => detector.id === plan.detectorId)) return "这台检测器当前不可用。";
   } else {
-    if (plan.detectorId || plan.samples > job.maxSamples) return "请在本批允许的样本数内取样。";
+    if (plan.detectorId || plan.samples > job.maxSamples) return `这是批次任务，请选择检查 0 到 ${job.maxSamples} 件样品。`;
   }
   return null;
 }
@@ -178,7 +178,7 @@ export function analyze(job: Case, plan: Plan): Analysis {
         const action = red ? plan.red : plan.green;
         branches.push({ label: red ? "标红" : "未标红", chance: next.chance, fault: next.fault, action, loss: loss(job, next.fault, action), weights: [] });
       }
-    } else branches.push({ label: "直接处置", chance: 1, fault, action: plan.red, loss: loss(job, fault, plan.red), weights: [] });
+    } else branches.push({ label: "不追加检测", chance: 1, fault, action: plan.red, loss: loss(job, fault, plan.red), weights: [] });
   } else {
     fault = job.rates.reduce((sum, rate, i) => sum + rate * job.weights[i], 0);
     cost = plan.samples * job.sampleCost;
@@ -193,7 +193,7 @@ export function analyze(job: Case, plan: Plan): Analysis {
 }
 
 export function missionError(mission: Mission, plans: readonly Plan[]): string | null {
-  if (plans.length !== mission.cases.length) return "请为每份检修单安排处置。";
+  if (plans.length !== mission.cases.length) return "请给每份检修单都填好处理方案。";
   let cost = 0;
   let work = 0;
   for (let i = 0; i < plans.length; i++) {
@@ -203,8 +203,8 @@ export function missionError(mission: Mission, plans: readonly Plan[]): string |
     cost += analysis.cost;
     work += analysis.work;
   }
-  if (cost > mission.budget) return `调查费用 ${cost} 点超过 ${mission.budget} 点预算。请调整检测或样本数。`;
-  if (work > mission.work) return `调查需要 ${work} 格工时，交班前只有 ${mission.work} 格。请调整安排。`;
+  if (cost > mission.budget) return `检测和取样要花 ${cost} 点，超过 ${mission.budget} 点预算。请换检测器或减少样品数。`;
+  if (work > mission.work) return `检测和取样需要 ${work} 格工时，本章只有 ${mission.work} 格。请换检测器或减少样品数。`;
   return null;
 }
 
@@ -229,7 +229,7 @@ function batchRate(job: Batch, seed: number): number {
 }
 
 export function sampleObservations(job: Batch, seed: number, n: number): boolean[] {
-  if (!Number.isInteger(n) || n < 0 || n > job.maxSamples) throw new Error("无效的样本数。");
+  if (!Number.isInteger(n) || n < 0 || n > job.maxSamples) throw new Error(`样本数须为 0 到 ${job.maxSamples} 之间的整数。`);
   const rate = batchRate(job, seed);
   return Array.from({ length: n }, (_, i) => randomUnit(seed, `${job.id}:sample:${i}`) < rate);
 }

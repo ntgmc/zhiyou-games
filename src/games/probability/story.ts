@@ -71,29 +71,38 @@ export function readGuide(value: unknown, id: number): Guide {
 }
 
 export function detectorExplanation(job: Device): string {
-  return `<p>原有故障概率 ${pct(job.prior)}，来自同类设备的校准记录。百分比是每 100 份同类情况中的平均占比，不保证这一台的状态。</p>
-    <p>“检出”指故障设备被标红，“误报”指正常设备也被标红。</p>
-    ${job.evidence.length && job.detectors.length ? "<p>模型把故障和正常两组分别看：在每组内，初筛结果不会改变新检测标红的机会，这叫条件独立。同一测量的转录件只计一次。</p>" : ""}`;
+  return `<p>过去的同类设备中，约 ${pct(job.prior)} 有故障。这是看到检测报告之前的判断。</p>
+    <p>检出率：坏设备被标红的比例。误报率：好设备被误标为异常的比例。未标红也可能漏掉故障。</p>
+    ${job.evidence.length && job.detectors.length ? "<p>复检是一次新测量。模型假设：固定设备实际是好的还是坏的以后，两次检测各按自己的概率工作，互不影响。这叫“条件独立”。抄写同一次检测的报告只算一份。</p>" : ""}`;
 }
 export function batchExplanation(job: Batch): string {
-  return `<p>这批有 ${job.count} 件待用设备。生产状态未知，模型只考虑 ${job.rates.map(pct).join("、")} 三种故障率。
-    原先对这三种状态的支持分别是 ${job.weights.map(pct).join("、")}，表示各状态成立的概率，来自事先校准，合计 100%。</p>
-    <p>取样使用同一生产状态下额外制备的样品，每件付 ${job.sampleCost} 点、占 1 格工时。实验室检查样品真实状态，不会漏报。
-    样品不属于这 ${job.count} 件待用设备；在每种生产状态内，一件的好坏不会改变另一件故障的概率，这叫条件独立。真实生产过程未必符合这些简化条件。</p>`;
+  return `<p>这批有 ${job.count} 件待用设备。我们暂时不知道生产线是哪种状态，先按以往记录考虑下面三种可能。</p>
+    <div class="table-wrap"><table><caption>检查样品前，对生产状态的判断</caption><thead><tr><th>该状态下的故障率</th><th>生产线处于该状态的概率</th></tr></thead><tbody>
+    ${job.rates.map((rate, i) => `<tr><td>${pct(rate)}</td><td>${pct(job.weights[i])}</td></tr>`).join("")}</tbody></table></div>
+    <p>样品和这批设备在同一生产状态下制成，额外取样不减少待用件数。每检查 1 件花 ${job.sampleCost} 点、占 1 格工时，检查能准确判断样品的好坏。</p>
+    <p>模型假设：生产状态相同时，各件设备的好坏互不影响。这叫“条件独立”。实际生产未必符合这个假设，也可能有表外的其他故障率。</p>`;
 }
 export function populationTable(prior: number, filtered: boolean): string {
   const badRed = prior * 1000 * SCREEN.sensitivity;
   const normalRed = (1 - prior) * 1000 * SCREEN.falseAlarm;
-  return `<div class="table-wrap"><table><caption>用 1,000 台作比例示意，实际取样数量会波动</caption><thead><tr><th>真实状态</th><th>${filtered ? "已经标红" : "同类设备数量"}</th></tr></thead>
+  return `<div class="table-wrap"><table><caption>按比例换算成 1,000 台，数量仅作示意</caption><thead><tr><th>设备实际情况</th><th>${filtered ? "其中被标红的数量" : "同类设备数量"}</th></tr></thead>
     <tbody><tr><th>有故障</th><td>${fmt(filtered ? badRed : prior * 1000)}</td></tr>
     <tr><th>正常</th><td>${fmt(filtered ? normalRed : (1 - prior) * 1000)}</td></tr></tbody></table></div>
-    ${filtered ? `<p class="observation">只看标红组：${fmt(badRed)} ÷ (${fmt(badRed)} + ${fmt(normalRed)}) = ${pct(badRed / (badRed + normalRed))} 有故障。</p>` : ""}`;
+    ${filtered ? `<p class="observation">标红组里，${fmt(badRed)} 台坏灯和 ${fmt(normalRed)} 台好灯混在一起。坏灯占 ${fmt(badRed)} ÷ (${fmt(badRed)} + ${fmt(normalRed)}) = ${pct(badRed / (badRed + normalRed))}。</p>` : ""}`;
 }
 export function branchTable(job: Device | Batch, plan: Parameters<typeof analyze>[1]): string {
   const analysis = analyze(job, plan);
-  return `<div class="table-wrap"><table><caption>按当前模型计算所有结果分支</caption><thead><tr><th>调查结果</th><th>出现概率</th><th>结果后的故障概率</th><th>处置</th><th>处置期望损失</th></tr></thead><tbody>
-    ${analysis.branches.map((branch) => `<tr><th>${h(branch.label)}</th><td>${pct(branch.chance)}</td><td>${pct(branch.fault)}</td><td>${branch.action === "keep" ? "保留" : "更换"}</td><td>${fmt(branch.loss)} 点</td></tr>`).join("")}
-    </tbody></table></div><p>调查费 ${fmt(analysis.cost)} 点 + 各分支的“出现概率 × 处置期望损失” = <strong>${fmt(analysis.expected)} 点</strong>。</p>`;
+  return `<div class="table-wrap"><table><caption>每种可能结果都按出现概率计入评分</caption><thead><tr><th>调查结果</th><th>出现概率</th><th>此时的故障概率</th><th>怎么处理</th><th>处理后的平均损失</th><th>计入评分的损失</th></tr></thead><tbody>
+    ${analysis.branches.map((branch) => `<tr><th>${h(branch.label)}</th><td>${pct(branch.chance)}</td><td>${pct(branch.fault)}</td><td>${branch.action === "keep" ? "保留" : "更换"}</td><td>${fmt(branch.loss)} 点</td><td>${fmt(branch.chance * branch.loss)} 点</td></tr>`).join("")}
+    </tbody></table></div><p>最后一列 = 出现概率 × 处理后的平均损失。把这一列相加，再加 ${fmt(analysis.cost)} 点调查费，方案平均损失为 <strong>${fmt(analysis.expected)} 点</strong>。这个平均数也叫“期望损失”。</p>`;
+}
+export function renderHints(mission: Mission, level: number, open: boolean): string {
+  return `<aside class="chapter-help" aria-label="本章提示"><button class="text-button help-toggle" data-command="hint" aria-expanded="${open}" aria-controls="chapter-hints">
+    本章提示<span>${level ? `已查看 ${level}/3 条` : "查看会记录为使用提示，不扣星"}</span><span aria-hidden="true">${open ? "−" : "+"}</span></button>
+    ${open ? `<div id="chapter-hints" class="hint-content">${mission.hints.slice(0, level).map((hint, i) =>
+      `<section><h3>${["思考方向", "关键条件", "参考方案"][i]}</h3><p>${h(hint)}</p></section>`).join("")}
+      ${level < 3 ? `<button data-command="hint-next">查看${level === 1 ? "关键条件" : "参考方案"}</button>` : ""}
+      <p class="muted">使用提示后，本次通过会记为“参考提示通过”。已有的独立成绩保留。</p></div>` : '<div id="chapter-hints" hidden></div>'}</aside>`;
 }
 export function renderGuide(guide: Guide, mission: Mission): string {
   const step = guideStep(guide, mission.id);
@@ -102,60 +111,70 @@ export function renderGuide(guide: Guide, mission: Mission): string {
   let task = "";
   if (step === "arrival") {
     text = mission.opening;
-    task = `<p>罗师傅：${mission.id === 8 ? "所有检修单都要安排。调查费用和工时共同使用，处置可以不同。条件和记录随时能查，决定由你来做。"
-      : "先在练习台观察这次需要的知识，再写正式方案。练习不消耗调查预算，也不会泄露正式检测结果。"}</p>`;
+    task = `<p>${mission.id === 8 ? "罗师傅：三份单都要处理，共用一份检测预算和工时。各份单怎么查、怎么处理，由你来定。"
+      : "罗师傅：先用练习台试一试，再安排这张单。练习不花正式预算，练习结果也和正式检测分开。"}</p>`;
   } else if (step === "population" || step === "filter") {
     const prior = (job as Device).prior;
     text = step === "population"
-      ? "罗师傅：记录里 20% 的同类灯有故障，就是每 100 台平均约 20 台。快速筛查会标出 90% 的故障灯，也会误标 5% 的正常灯。先看看被标红的是哪些。"
-      : "罗师傅：这次原有故障概率是 2%，就是每 100 台平均约 2 台。检测器表现没变，但正常设备多了，误报也会多。点击“只看标红组”比较这组内部的数量。";
+      ? "记录里，20% 的同类灯有故障，意思是每 100 台平均约 20 台坏了。快速筛查能标出 90% 的坏灯，也会把 5% 的好灯误标红。筛出标红的灯，看看里面好坏各有多少。"
+      : "这次同类灯的故障概率是 2%，每 100 台平均约 2 台坏了。检测器没变，好灯却更多了。点“只看标红组”，看看误报的好灯占了多少。";
     task = populationTable(prior, guide.filtered) + `<button data-guide="filter">只看标红组</button>`
-      + (guide.filtered ? "<p>条件概率就是知道某个条件后，只在符合条件的对象中计算占比。这里的条件是“已经标红”。</p>" : "");
+      + (guide.filtered ? "<p>我们只在“已经标红”的灯里算坏灯的占比，这叫条件概率。好灯被误标红，叫误报。</p>" : "");
   } else if (step === "frequency") {
-    text = "罗师傅：按 20% 的概率，试着抽 20 台同类灯。抽到的故障占比叫这次观察到的频率。换一组样本，它可能变化。";
+    text = "现在抽 20 台同类灯看看。我们抽到的坏灯占比叫“频率”，换一组可能会变。记录里的故障概率仍是 20%。";
     const counts = [guide.runs - 1, guide.runs].filter((run) => run > 0).map((run) =>
       Array.from({ length: 20 }, (_, i) => randomUnit(mission.seed, `practice:${run}:${i}`) < 0.2).filter(Boolean).length);
     task = `<button data-guide="draw" ${guide.runs >= 100 ? "disabled" : ""}>抽取一组 20 台</button>${counts.map((count, i) =>
-      `<p class="observation">${counts.length > 1 && i === 0 ? "上一组" : "当前组"}：${count} 台故障，观察频率 ${pct(count / 20)}。模型概率仍是 20%。</p>`).join("")}
-      <p>可以再抽一组比较。这是练习样本；正式任务评价整套方案的平均损失，一次抽样结果另行记录。</p>`;
+      `<p class="observation">${counts.length > 1 && i === 0 ? "上一组" : "这一组"}抽到 ${count} 台坏灯，占 ${count} ÷ 20 = ${pct(count / 20)}。</p>`).join("")}
+      <p>可以再抽一组比较。20% 说明同类灯有多大可能坏了，不能保证每组都正好抽到 4 台坏灯。</p>`;
   } else if (step === "update") {
-    text = "罗师傅：加入新证据之前的判断叫先验，加入之后叫后验。现在先验是初筛标红后的 26.87%。台架能检出 95% 的故障，正常设备误报 1%。分别试试两种结果。";
+    text = "初筛标红后，我们判断这盏有 26.87% 的可能坏了。“台架复检”就是接到检测台上再测一次，它能检出 95% 的坏灯，会误标 1% 的好灯。分别假设复检标红、未标红，看看故障概率会怎么变。";
     const device = job as Device;
     const before = deviceProbability(device);
     task = `<div class="actions"><button data-guide="red">假设复检标红</button><button data-guide="green">假设复检未标红</button></div>
-      ${guide.outcome === null ? "" : `<p class="observation">复检${guide.outcome ? "标红" : "未标红"}，后验故障概率 ${pct(update(before, PRECISE.sensitivity, PRECISE.falseAlarm, guide.outcome).fault)}。</p>`}
-      <p>同一测量转录多份不会增加证据。台架这次是新的测量，模型假设它与初筛在真实状态确定后相互独立。</p>
-      <p>已观察：标红 ${guide.redSeen ? "✓" : "待试"}；未标红 ${guide.greenSeen ? "✓" : "待试"}。</p>`;
+      ${guide.outcome === null ? "" : `<p class="observation">如果复检${guide.outcome ? "标红" : "未标红"}，故障概率会从 ${pct(before)} 变为 ${pct(update(before, PRECISE.sensitivity, PRECISE.falseAlarm, guide.outcome).fault)}。</p>
+      <p>复检前的判断叫“先验”，看到结果后的判断叫“后验”。结合已有判断和新检测效果重新计算，叫贝叶斯更新。</p>`}
+      <p>这里假设：灯实际坏了时，两次检测各按自己的检出率工作；灯是好的时，各按自己的误报率工作，互不影响。这叫条件独立。抄一份报告不能算作新检测。</p>
+      <p class="practice-status">标红结果：${guide.redSeen ? "已试过" : "还没试"} · 未标红结果：${guide.greenSeen ? "已试过" : "还没试"}</p>`;
   } else if (step === "cost" || step === "tools") {
     text = step === "cost"
-      ? "罗师傅：损失统一用“点”计量，既包括花掉的材料，也包括留下故障的后果。期望损失是同类情况重复发生时的平均损失。调查费也得记入方案。"
-      : "罗师傅：便携检测只占 1 格工时，台架占 2 格。工具说明里，检出率表示故障被标红的概率，误报率表示正常被标红的概率。先比较一次完整方案。";
-    task = `<button data-guide="compare">比较处置方案</button>`;
+      ? "我们用“点”把检测费、更换费和留下坏灯的损失记在一本账上。按同一方案处理很多次同类任务，平均每次损失多少，叫“期望损失”。点开比较，看看检测费涨了以后哪种处理划算。"
+      : "便携检测花 1 点、占 1 格工时，台架花 3 点、占 2 格。1 格代表一份检查工作量，游戏里不用等时间过去。便宜的检测可能漏掉更多坏风机，先算算两种方案的总损失。";
+    task = `<button data-guide="compare">比较处理方案</button>`;
     if (guide.tried && job.kind === "device") {
-      task += `<p>直接更换：${job.replaceCost} 点；直接保留：${pct(deviceProbability(job))} × ${job.faultLoss} = ${fmt(deviceProbability(job) * job.faultLoss)} 点。</p>`;
+      task += `<p>直接更换花 ${job.replaceCost} 点。保留时，好设备不产生故障损失，坏设备会损失 ${job.faultLoss} 点；平均损失为 ${pct(deviceProbability(job))} × ${job.faultLoss} = ${fmt(deviceProbability(job) * job.faultLoss)} 点。</p>`;
       for (const detector of job.detectors) {
         task += `<h3>${h(detector.name)}：标红更换，未标红保留</h3>` + branchTable(job, { detectorId: detector.id, red: "replace", green: "keep", samples: 0, cutoff: 1 });
       }
     }
   } else if (step === "source") {
-    text = "罗师傅：两张纸可能只是同一份测量的原件和抄件。看看页脚的来源编号，再决定它们是否提供了两次独立信息。";
+    text = "这两张纸，可能只是同一次检测的原件和抄件。核对页脚的测量编号，看看一共测过几次。";
     task = `<button data-guide="trace">核对报告来源</button>${guide.traced && job.kind === "device"
       ? `<ul>${job.evidence.map((report) => `<li>${h(report.title)}：${h(report.source)}，${report.red ? "标红" : "未标红"}</li>`).join("")}</ul>
-      <p class="observation">两份报告都来自 A-17，只计一次。当前故障概率仍为 ${pct(deviceProbability(job))}。</p>` : ""}`;
+      <p class="observation">两份报告的编号都是 A-17，只测过一次。计算时用一次报告，故障概率仍是 ${pct(deviceProbability(job))}。</p>` : ""}`;
   } else if (step === "sample" && job.kind === "batch") {
-    text = "罗师傅：样品有几件坏，会改变我们对生产状态的判断。先用练习批次试两件，再试四件。练习与正式任务来自不同批次，结果分别保存。";
+    text = "这批开关有多大可能出故障，要借样品来判断。先检查 2 件练习样品，也可以增加到 4 件。练习批次和正式批次分开，结果互不影响。";
     task = batchExplanation(job) + `<button data-guide="sample">${guide.samples === 2 ? "把练习样本增加到 4 件" : "检查 2 件练习样品"}</button>`;
     if (guide.samples) {
       const observations = sampleObservations(job, mission.seed + 1, guide.samples);
       const k = observations.filter(Boolean).length;
       const next = samplePosterior(job, guide.samples, k);
       task += `<p class="observation">${guide.samples} 件样品：${observations.map((bad, i) => `${i + 1} 号${bad ? "故障" : "正常"}`).join("，")}。</p>
-        <ul>${job.rates.map((rate, i) => `<li>故障率 ${pct(rate)} 的状态：支持程度由 ${pct(job.weights[i])} 变为 ${pct(next.weights[i])}。</li>`).join("")}</ul>
-        <p>把三种故障率各乘它新的支持概率，再相加，得到加权平均故障率 ${pct(next.fault)}。没有抽到坏件，也不能认定整批没有故障。</p>`;
+        <ul>${job.rates.map((rate, i) => `<li>生产线处于“故障率 ${pct(rate)}”状态的概率：从 ${pct(job.weights[i])} 变为 ${pct(next.weights[i])}。</li>`).join("")}</ul>
+        <p>用每种状态的新概率乘它的故障率，再相加，待用设备的平均故障率为 ${pct(next.fault)}。这个算法叫加权平均：更可能出现的状态，算进去的份量更大。没查到坏样品，也不能保证这批全是好的。</p>`;
     }
   }
-  return `<section class="card dialogue" aria-labelledby="guide-title"><p class="eyebrow">检修站 · 第 ${mission.id} 章 · 引导 ${guide.step + 1}/${guideLength(mission.id)}</p>
-    <h2 id="guide-title">${h(mission.title)}</h2><p>${h(text)}</p><div class="practice">${task}</div>
-    <button class="primary" data-command="advance" ${guideReady(guide, mission.id) ? "" : "disabled"}>${step === "arrival" ? "接下检修单" : "继续"}</button>
-    ${guideReady(guide, mission.id) ? "" : '<p class="muted">先完成上面的练习，再继续。</p>'}</section>`;
+  const last = guide.step === guideLength(mission.id) - 1;
+  return `<div class="guide-layout"><aside class="scene-file" aria-label="本章检修单"><span class="file-tab">街区检修站</span>
+    <div class="repair-illustration" aria-hidden="true"><span class="lamp-shade"></span><span class="lamp-stem"></span><span class="lamp-base"></span></div>
+    <p class="eyebrow">第 ${String(mission.id).padStart(2, "0")} 章 · ${mission.cases.length} 份检修单</p><h2>${h(job.title)}</h2>
+    <p>${h(job.requester)}：${h(job.request)}</p>${mission.cases.length > 1 ? `<ul>${mission.cases.slice(1).map((item) => `<li>${h(item.title)}</li>`).join("")}</ul>` : ""}
+    <span class="file-stamp">${mission.id === 8 ? "独立值班" : "待检修"}</span></aside>
+    <section class="card dialogue" aria-labelledby="guide-title"><div class="guide-heading"><p class="eyebrow">第 ${mission.id} 章 · ${h(mission.concept)}</p>
+    <span class="step-count">${guide.step + 1} / ${guideLength(mission.id)}</span></div>
+    <div class="guide-progress" aria-label="引导 ${guide.step + 1}/${guideLength(mission.id)}">${STEPS[mission.id - 1].map((_, i) => `<span class="${i <= guide.step ? "seen" : ""}" aria-hidden="true"></span>`).join("")}</div>
+    <h1 id="guide-title" tabindex="-1">${h(mission.title)}</h1><div class="speaker"><span aria-hidden="true">${step === "arrival" ? "记" : "罗"}</span><div>${step === "arrival" ? "报修记录" : "罗师傅"}<small>${step === "arrival" ? "检修单送到了" : "带你试一次"}</small></div></div>
+    <p class="dialogue-copy">${h(text)}</p><div class="practice"><p class="practice-label">${step === "arrival" ? "接单说明" : "练习台"}</p>${task}</div>
+    <div class="guide-actions"><button class="primary" data-command="advance" ${guideReady(guide, mission.id) ? "" : "disabled"}>${step === "arrival" ? mission.id === 8 ? "开始独立值班" : "接下检修单" : last ? "去安排检修方案" : "继续"}</button>
+    ${guideReady(guide, mission.id) ? "" : '<p class="muted">完成这一步练习后，就可以继续。</p>'}</div></section></div>`;
 }

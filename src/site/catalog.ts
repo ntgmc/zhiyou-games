@@ -33,7 +33,7 @@ export const GAMES: readonly GameEntry[] = [
     id: "probability",
     title: "检修站：证据与选择",
     subject: "概率与统计推断",
-    description: "接下街区的检修单。查清检测报告的来源，比较复检与更换的代价，取样判断一批设备，把有限的调查资源用在值得的地方。",
+    description: "检测器标红，设备就一定坏了吗？接下街区的检修单，查报告、检查样品，比较先检测和直接更换的损失，决定怎么处理设备。",
     tags: ["条件概率", "贝叶斯更新", "期望损失", "批次推断"],
     chapters: 8,
     chapterLabel: "章",

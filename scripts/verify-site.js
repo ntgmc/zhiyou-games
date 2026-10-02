@@ -61,7 +61,7 @@ async function verify() {
     ...["engine", "missions", "storage"].map((name) => [new URL(`./${name}.js`, harborAppUrl), /(?:javascript|ecmascript)/]),
     [repairAppUrl, /(?:javascript|ecmascript)/],
     [new URL(repairCss, repairUrl), /text\/css/],
-    ...["engine", "missions", "storage", "story"].map((name) => [new URL(`./${name}.js`, repairAppUrl), /(?:javascript|ecmascript)/]),
+    ...["engine", "missions", "storage", "story", "results"].map((name) => [new URL(`./${name}.js`, repairAppUrl), /(?:javascript|ecmascript)/]),
     [new URL("../../assets/share-card.png", appUrl), /image\/png/],
     ...["orbit", "code", "storm", "arrival"].map((id) =>
       [new URL(`../../../assets/music/${id}.mp3`, gameAppUrl), /^audio\/(?:mpeg|mp3)(?:;|$)/]),
