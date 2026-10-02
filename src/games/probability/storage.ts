@@ -3,6 +3,7 @@ import type { Plan, Result } from "./engine.js";
 import { MISSIONS } from "./missions.js";
 import { freshGuide, readGuide } from "./story.js";
 import type { Guide } from "./story.js";
+import { readChapters, type ChapterDrafts } from "../../shared/chapter-drafts.js";
 
 export interface Save {
   version: 1;
@@ -16,6 +17,7 @@ export interface Save {
   hinted: boolean;
   mode: "story" | "desk";
   result: Result | null;
+  chapters?: ChapterDrafts;
 }
 export const SAVE_KEY = "repair-station-save-v1";
 export function freshSave(): Save {
@@ -52,6 +54,8 @@ export function readSave(key: string, storage?: Pick<Storage, "getItem">): Save 
   try {
     const data = JSON.parse((storage ?? localStorage).getItem(key) ?? "null");
     if (!data || data.version !== 1) return fallback;
+    const chapters = readChapters(data.chapters, MISSIONS.length);
+    if (chapters) fallback.chapters = chapters;
     fallback.best = scores(data.best);
     fallback.solo = scores(data.solo);
     for (const id of Object.keys(fallback.solo)) {

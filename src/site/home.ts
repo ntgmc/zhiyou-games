@@ -1,9 +1,13 @@
 import { GAMES } from "./catalog.js";
 import { escapeHtml } from "../shared/html.js";
+import { savedChapter } from "./progress.js";
 
 const catalog = document.querySelector<HTMLElement>("#game-catalog");
 if (!catalog) throw new Error("Missing game catalog");
-catalog.innerHTML = GAMES.map((game, index) => `
+const testing = new URLSearchParams(location.search).has("test");
+catalog.innerHTML = GAMES.map((game, index) => {
+  const chapter = savedChapter(game, testing);
+  return `
   <article class="game-card">
     <a class="game-art ${game.id === "game-theory" ? "harbor-art" : game.id === "probability" ? "repair-art" : game.id === "network" ? "network-art" : ""}" href="${escapeHtml(game.href)}" aria-label="进入${escapeHtml(game.title)}">
       <span class="art-label">${escapeHtml(game.subject)} / KNOWLEDGE GAME <span>${game.chapters} CHAPTERS</span></span>
@@ -17,10 +21,12 @@ catalog.innerHTML = GAMES.map((game, index) => `
       <div class="game-meta"><span>GAME ${String(index + 1).padStart(2, "0")} / ${escapeHtml(game.subject)}</span><span class="available">已上线</span></div>
       <h3><a href="${escapeHtml(game.href)}">${escapeHtml(game.title)}</a></h3>
       <p>${escapeHtml(game.description)}</p>
+      <p class="first-task">${chapter ? `上次停在第 ${chapter} 章，进入后接着玩。` : escapeHtml(game.firstTask)}</p>
       <ul class="game-tags" aria-label="涉及知识">${game.tags.map((tag) => `<li>${escapeHtml(tag)}</li>`).join("")}</ul>
-      <div class="game-bottom"><span>${game.chapters} ${escapeHtml(game.chapterLabel ?? "个航段")} · 剧情引导与独立挑战</span><a class="play-link" href="${escapeHtml(game.href)}">进入游戏 <span aria-hidden="true">↗</span></a></div>
+      <div class="game-bottom"><span>${game.chapters} ${escapeHtml(game.chapterLabel ?? "个航段")} · 剧情引导与独立挑战</span><a class="play-link" href="${escapeHtml(game.href)}">${chapter ? "继续游戏" : "开始第一章"} <span aria-hidden="true">↗</span></a></div>
     </div>
-  </article>`).join("");
+  </article>`;
+}).join("");
 const count = document.querySelector("#game-count");
 if (count) count.textContent = `${String(GAMES.length).padStart(2, "0")} 款游戏`;
 

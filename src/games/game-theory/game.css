@@ -76,6 +76,8 @@ main { padding: var(--space-lg) var(--space-md) var(--space-2xl); max-width: 128
 .experiment-result, .learning, .cost-preview { padding: var(--space-md); border-left: 3px solid var(--color-accent); background: var(--color-paper-2); font-size: var(--text-sm); }
 .learning strong { display: block; color: var(--color-accent); margin-bottom: var(--space-sm); }
 .table-scroll { overflow-x: auto; max-width: 100%; margin-block: var(--space-md); }
+.conditions > .table-scroll { max-height: 24rem; overflow: auto; }
+.order-table thead th { position: sticky; top: 0; background: var(--color-paper-2); }
 .order-table { min-width: 680px; width: 100%; border-collapse: collapse; font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
 .order-table caption { text-align: left; color: var(--color-muted); margin-bottom: var(--space-sm); }
 .order-table th, .order-table td { border: 1px solid var(--color-rule); padding: var(--space-sm); text-align: left; }
@@ -109,7 +111,7 @@ summary { min-height: 44px; padding-block: var(--space-sm); font-size: var(--tex
 .payoffs td strong { font-size: var(--text-lg); font-weight: 600; }
 .payoffs td span { font-size: var(--text-sm); color: var(--color-muted); white-space: nowrap; }
 .payoffs td small { display: block; color: var(--color-accent); font-size: .75rem; }
-.forecast { display: grid; gap: var(--space-lg); margin-block: var(--space-md); }
+.forecast { display: grid; gap: var(--space-sm); margin-block: var(--space-md); }
 .forecast p, .rule-note { font-size: var(--text-sm); color: var(--color-muted); }
 .forecast .compact { margin-top: var(--space-sm); }
 .decision { padding-top: var(--space-lg); border-top: 1px solid var(--color-rule); }

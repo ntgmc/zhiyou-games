@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { GAMES } from "../.build/src/site/catalog.js";
+import { savedChapter } from "../.build/src/site/progress.js";
 import { readSave, writeSave } from "../.build/src/games/information/storage.js";
 import { createSession, transmitRound, treeToCodes, validateCodebook, averageLength, makeHuffman } from "../.build/src/games/information/engine.js";
 import { MISSIONS } from "../.build/src/games/information/missions.js";
@@ -45,9 +46,24 @@ test("the relocated game restores version-one progress and current sessions", ()
   assert.equal(readSave("deep-space-comms-test-v1", storage).activeId, 1);
   const unavailable = { getItem() { throw new Error("Storage unavailable"); }, setItem() { throw new Error("Storage unavailable"); } };
   assert.equal(readSave("save", unavailable).activeId, 1);
-  assert.doesNotThrow(() => writeSave("save", loaded, unavailable));
+  assert.equal(writeSave("save", loaded, unavailable), false);
+  assert.equal(writeSave("save", loaded, storage), true);
   values.set("broken", JSON.stringify({ ...legacy, session: { ...session, protection: "unknown" } }));
   assert.equal(readSave("broken", storage).session, null);
+});
+
+test("home continuation uses the matching save profile and tolerates missing or broken storage", () => {
+  for (const game of GAMES) {
+    const values = new Map([[game.saveKey, JSON.stringify({ version: 1, activeId: 2, session: { missionId: 2, history: [] }, plans: [], routes: [] })]]);
+    const storage = { getItem: (key) => values.get(key) ?? null };
+    assert.equal(savedChapter(game, false, storage), 2);
+    assert.equal(savedChapter(game, true, storage), null);
+    values.set(game.testKey, "{");
+    assert.equal(savedChapter(game, true, storage), null);
+    values.set(game.testKey, JSON.stringify({ version: 1, activeId: game.chapters + 1 }));
+    assert.equal(savedChapter(game, true, storage), null);
+    assert.equal(savedChapter(game, false, { getItem() { throw new Error("blocked"); } }), null);
+  }
 });
 
 test("extracted tree and correction workshops keep their teaching behavior", () => {

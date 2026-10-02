@@ -13,7 +13,11 @@ import { readSave, writeSave } from "./storage.js";
 import { icon, stars, modalFrame as frame } from "./ui.js";
 import { storyResult, detailedResult } from "./results.js";
 import { escapeHtml } from "../../shared/html.js";
+import { rememberView } from "../../shared/view-state.js";
+import { archiveChapter, resumeChapter } from "../../shared/chapter-drafts.js";
+import { backupControls, installBackup } from "../../shared/save-backup.js";
 import type { Chapter, Coding, Packet, Protection, RoundResult, StoryStep } from "./types.js";
+import type { Save } from "./storage.js";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
 const STORAGE_KEY = new URLSearchParams(location.search).has("test") ? "deep-space-comms-test-v1" : "deep-space-comms-save-v1";
@@ -24,12 +28,15 @@ const siteHome = new URL("../../", location.href);
 if (new URLSearchParams(location.search).has("test")) siteHome.searchParams.set("test", "1");
 const saved = readSave(STORAGE_KEY);
 const progress = saved.progress;
+let chapters = saved.chapters;
 const chapterRanges: [number, number, string][] = [[1, 5, "学习基础 · 1～5"], [6, 8, "独立考核 · 6～8"], [9, 12, "进阶航段 · 9～12"], [13, 18, "返航值班 · 13～18"], [19, MISSIONS.length, `综合值班 · 19～${MISSIONS.length}`]];
 const campaignEntries = [9, 13, 19];
 let mission = MISSIONS.find((item) => item.id === saved.activeId) || MISSIONS[0];
 let session = prepareStory(saved.session?.missionId === mission.id ? saved.session : createSession(mission), mission);
 let consoleMode = progress.consoleMode === true;
 let busy = false;
+let storageFailed = false;
+let renderedMission = 0;
 type Modal = { type: string; phase?: number; lesson?: string; result?: RoundResult; historical?: boolean; detailed?: boolean };
 let modal: Modal | null = null;
 let treeState: TreeState = { forest: [], selected: [], undo: [], next: 4, feedback: "" };
@@ -46,7 +53,20 @@ const music = new GameAudio({
 });
 
 function save() {
-  writeSave(STORAGE_KEY, { version: 1, progress, activeId: mission.id, session });
+  storageFailed = !writeSave(STORAGE_KEY, currentSave());
+  updateSaveStatus();
+}
+
+function currentSave(): Save {
+  return { version: 1, progress, activeId: mission.id, session, ...(chapters ? { chapters } : {}) };
+}
+
+function updateSaveStatus() {
+  const status = app.querySelector<HTMLElement>("#save-status");
+  if (status) {
+    status.textContent = storageFailed ? "这次未能保存。刷新或关闭页面可能丢失进度，可在值班菜单导出备份。" : "进度自动保存";
+    status.classList.toggle("danger-text", storageFailed);
+  }
 }
 
 function completedCount() {
@@ -61,8 +81,13 @@ function toast(message: string) {
 }
 
 function render() {
+  const restore = rememberView(app);
+  const sameMission = renderedMission === mission.id;
   if (consoleMode) renderConsole();
   else renderStory();
+  if (sameMission) restore();
+  renderedMission = mission.id;
+  updateSaveStatus();
   syncMusicScene();
   updateMusicUI();
 }
@@ -110,13 +135,13 @@ function renderConsole() {
         <div class="sidebar-bottom">
           <div class="training-progress"><span>训练进度</span><strong>${Math.round(completed / MISSIONS.length * 100)}%</strong></div>
           <div class="progress-track"><i style="width:${completed / MISSIONS.length * 100}%"></i></div>
-          <div class="operator"><span class="operator-avatar">C</span><span><strong>${completed === MISSIONS.length ? "深空通信官" : completed >= 4 ? "助理通信官" : "见习通信官"}</strong><small>本地档案 · 自动保存</small></span><span class="status-dot"></span></div>
+          <div class="operator"><span class="operator-avatar">C</span><span><strong>${completed === MISSIONS.length ? "深空通信官" : completed >= 4 ? "助理通信官" : "见习通信官"}</strong><small id="save-status" role="status">进度自动保存</small></span><span class="status-dot"></span></div>
         </div>
       </aside>
       <main class="main">
         <header class="topbar">
           <div class="breadcrumb"><span>任务控制台</span>${icon("chevron")}<strong>航段 ${String(mission.id).padStart(2, "0")}</strong></div>
-          <div class="topbar-right"><button class="text-button" data-action="story-mode">返回剧情引导</button>${musicButton()}<button class="icon-button" data-action="help" aria-label="玩法说明" title="玩法说明">${icon("info")}</button></div>
+          <div class="topbar-right"><button class="text-button" data-action="story-menu">值班菜单</button><button class="text-button" data-action="story-mode">返回剧情引导</button>${musicButton()}<button class="icon-button" data-action="help" aria-label="玩法说明" title="玩法说明">${icon("info")}</button></div>
         </header>
         <div class="main-content">
           <section class="hero">
@@ -268,6 +293,7 @@ function renderStory() {
   app.innerHTML = `<div class="story-shell ${intro ? "in-prologue" : "in-practice"}">
     ${storyHeader()}
     <main class="story-main">
+      ${!intro && mission.independent && session.status === "playing" ? `<div class="planning-status" aria-label="当前通信预算"><span id="planning-status-value"></span><a href="#send-button">核对发送 ↓</a></div>` : ""}
       ${intro ? renderPrologue(chapter) : session.status !== "playing" ? renderStoryEnding() : `
         <div class="story-practice">
           <aside class="mentor-column">
@@ -284,8 +310,9 @@ function renderStory() {
             ${renderStoryTask(step)}
           </section>
         </div>
-        <footer class="story-footer"><button class="text-button muted" data-action="replay-story">${icon("reset")}${mission.independent ? "重开本次任务" : "重看本章引导"}</button><span>进度自动保存</span>${mission.independent ? `<button class="text-button muted" data-action="hint">查看提示 ${icon("arrow")}</button>` : `<button class="text-button muted" data-action="skip-guide">自由操作 ${icon("arrow")}</button>`}</footer>
+        <footer class="story-footer"><button class="text-button muted" data-action="replay-story">${icon("reset")}${mission.independent ? "重开本次任务" : "重看本章引导"}</button>${mission.independent ? `<button class="text-button muted" data-action="hint">查看提示 ${icon("arrow")}</button>` : `<button class="text-button muted" data-action="skip-guide">自由操作 ${icon("arrow")}</button>`}</footer>
       `}
+      <p class="microcopy" id="save-status" role="status">进度自动保存</p>
     </main>
   </div>`;
   if (!intro && session.status === "playing") updateStoryLive();
@@ -410,6 +437,11 @@ function renderStoryTask(step: StoryStep) {
 
 function updateStoryLive() {
   const plan = planRound(session, mission);
+  const summary = $("#planning-status-value");
+  if (summary) {
+    summary.textContent = `第 ${session.round} 轮 · ${plan.totalBits} / ${roundConditions(mission, session.round).budget} bit${mission.totalBudget != null ? ` · 整班余 ${mission.totalBudget - session.totalBits} bit` : ""}`;
+    summary.classList.toggle("danger-text", !plan.valid && plan.selected.length > 0);
+  }
   if ($("#story-cost")) {
     $("#story-cost").textContent = String(plan.totalBits);
     $("#story-cost").classList.toggle("danger-text", plan.totalBits > plan.budget);
@@ -564,12 +596,15 @@ function setMission(id: number) {
   if ((id > progress.unlocked && !campaignEntries.includes(id)) || busy) return;
   const nextMission = MISSIONS.find((item) => item.id === id);
   if (!nextMission) return;
+  if (id === mission.id) { closeModal(); return; }
+  chapters = archiveChapter(currentSave());
+  const restored = resumeChapter(currentSave(), id, readSave, { progress });
   mission = nextMission;
   if (campaignEntries.includes(id)) progress.unlocked = Math.max(progress.unlocked, id);
   tuningOpen = false;
   futureForecastOpen = false;
   queueOverviewOpen = false;
-  session = prepareStory(createSession(mission), mission);
+  session = prepareStory(restored?.session ?? createSession(mission), mission);
   closeModal();
   save();
   render();
@@ -581,6 +616,7 @@ function restart() {
   tuningOpen = false;
   futureForecastOpen = false;
   queueOverviewOpen = false;
+  if (chapters) delete chapters[mission.id];
   session = prepareStory(createSession(mission), mission);
   closeModal();
   save();
@@ -636,6 +672,7 @@ function modalFrame(title: string, eyebrow: string, content: string, className =
 
 function renderModal() {
   if (!modal) return;
+  const restore = rememberView(modalRoot);
   if (modal.type === "music") {
     modalRoot.innerHTML = modalFrame("值班配乐", "DEEP SPACE / ORIGINAL SCORE", renderMusicSettings(music.state), "music-modal");
   } else if (modal.type === "story-menu") {
@@ -646,8 +683,9 @@ function renderModal() {
       <div class="challenge-entry"><div><strong>继续第 12 关之后的值班</strong><p>第 13 航段起需要规划整次发送。后续会用到手工码本、混合保护和六轮队列，提示按需查看。</p></div><button class="secondary-button" data-action="mission" data-id="13">接通返航线 ${icon("arrow")}</button></div>
       <div class="challenge-entry"><div><strong>准备好排一整班了吗？</strong><p>从第 19 航段起综合使用已有知识。队列逐步增至三十份请求，终关建议预留 1～2 小时独立规划。</p></div><button class="secondary-button" data-action="mission" data-id="19">进入综合值班 ${icon("arrow")}</button></div>
       ${chapterRanges.map(([first, last, title]) => `<div class="small-section-title">${title}<span>${first === 1 ? "剧情互动教学" : first === 6 ? "自主设计通信方案" : first === 9 ? "窗口与同步" : first === 13 ? "完整计划与手工码本" : "综合调度与预算"}</span></div><div class="chapter-choices">${MISSIONS.filter(({ id }) => id >= first && id <= last).map((item) => `<button class="chapter-choice ${item.id === mission.id ? "current" : ""}" data-action="mission" data-id="${item.id}" ${item.id > progress.unlocked && !campaignEntries.includes(item.id) ? "disabled" : ""}><span class="mono">${String(item.id).padStart(2, "0")}</span><strong>${item.chapter}${progress.soloBest?.[item.id] ? '<small class="solo-mark">独立通过</small>' : ""}</strong>${progress.best[item.id] ? stars(progress.best[item.id]) : item.id > progress.unlocked && !campaignEntries.includes(item.id) ? icon("lock") : icon("arrow")}</button>`).join("")}</div>`).join("")}
-      <p class="microcopy">重新体验会重置本章当前的发送记录，已经获得的星级与解锁进度会保留。</p>
+      <p class="microcopy">切换章节会保留各章当前尝试，回来后接着发送。重新体验只重置本章的发送记录和引导，已有星级与解锁进度保留。</p>
       <p class="microcopy">档案保存在这台设备的当前浏览器中。换设备、换网址或清理浏览器数据后，进度不会自动同步。</p>
+      ${backupControls()}
     `, "story-menu-modal");
   } else if (modal.type === "help") {
     modalRoot.innerHTML = modalFrame("值班操作说明", "OPERATOR HANDBOOK", `
@@ -692,6 +730,7 @@ function renderModal() {
       ? storyResult(session, mission, result) : detailedResult(session, mission, result, modal.historical);
   }
   updateMusicUI();
+  restore();
 }
 
 function openTree() {
@@ -700,8 +739,14 @@ function openTree() {
 }
 
 function renderTreeModal() {
+  const restore = rememberView(modalRoot);
+  const wasFocused = modalRoot.contains(document.activeElement);
   const learning = !consoleMode && storyStep(session, mission).action === "tree";
   modalRoot.innerHTML = modalFrame("构造码树", "HUFFMAN WORKSHOP", renderTree(treeState, selectedCounts(session, mission), learning), "tree-modal");
+  restore();
+  if (wasFocused && !modalRoot.contains(document.activeElement)) {
+    modalRoot.querySelector<HTMLElement>('[data-action="tree-apply"], [data-action="tree-select"]')?.focus({ preventScroll: true });
+  }
 }
 
 function mergeTreeNodes() {
@@ -715,8 +760,10 @@ function openLab() {
 }
 
 function renderLabModal() {
+  const restore = rememberView(modalRoot);
   const learning = !consoleMode && storyStep(session, mission).action === "lab";
   modalRoot.innerHTML = modalFrame("汉明纠错实验", "HAMMING (7,4) / INTERACTIVE LAB", renderLab(labState, learning), "lab-modal");
+  restore();
 }
 
 function renderTransmittingModal() {
@@ -903,7 +950,8 @@ document.addEventListener("toggle", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeModal();
   if (event.key === "Tab" && modal) {
-    const focusable = [...modalRoot.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), summary, a[href]")];
+    const focusable = [...modalRoot.querySelectorAll<HTMLElement>("button:not(:disabled):not([hidden]), input:not(:disabled), summary, a[href]")]
+      .filter((element) => element.getClientRects().length > 0);
     if (!focusable.length) { event.preventDefault(); return; }
     const first = focusable[0];
     const last = focusable.at(-1)!;
@@ -925,4 +973,14 @@ document.addEventListener("visibilitychange", () => music.setHidden(document.hid
 window.addEventListener("pagehide", () => music.setHidden(true));
 window.addEventListener("pageshow", () => music.setHidden(document.hidden));
 
+save();
 render();
+installBackup(modalRoot, "information", readSave, currentSave, (next) => {
+  Object.assign(progress, next.progress);
+  chapters = next.chapters;
+  mission = MISSIONS[next.activeId - 1];
+  session = prepareStory(next.session ?? createSession(mission), mission);
+  consoleMode = progress.consoleMode === true;
+  tuningOpen = false; futureForecastOpen = false; queueOverviewOpen = false;
+  closeModal(); save(); render(); focusStory();
+}, toast);

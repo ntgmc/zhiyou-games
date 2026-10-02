@@ -998,6 +998,12 @@ h1 { font-size: clamp(23px, 2.2vw, 33px); font-weight: 600; letter-spacing: 1px;
 .receiver-codebook { border: 1px solid #35574e; border-radius: 5px; background: #142c28; padding: 12px; display: flex; flex-direction: column; gap: 7px; margin: 12px 0; }
 .receiver-codebook > span { font-size: 10px; color: #85a799; }
 .receiver-codebook code { font-family: var(--mono); color: #bdded1; font-size: 11px; overflow-wrap: anywhere; }
+.planning-status { display: none; }
+@media (max-width: 760px) {
+  .planning-status { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; margin-bottom: 16px; border: 1px solid #3a545b; border-radius: 6px; background: #101f2a; font-size: 12px; }
+  .planning-status a { color: var(--mint); white-space: nowrap; }
+  #send-button, .story-tuning input, .dispatch-packets [data-action] { scroll-margin-top: 90px; }
+}
 .receiver-codebook .text-button { align-self: flex-start; font-size: 10px; }
 .auto-scope { color: #a49d84; font-size: 10px; line-height: 1.8; margin: 16px 0 10px; }
 .packet-breakdown { padding: 12px 0; border-top: 1px solid #2d4550; font-size: 10px; color: #9eb4bc; }

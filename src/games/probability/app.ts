@@ -1,4 +1,7 @@
 import { escapeHtml as h } from "../../shared/html.js";
+import { rememberView } from "../../shared/view-state.js";
+import { archiveChapter, resumeChapter } from "../../shared/chapter-drafts.js";
+import { backupControls, installBackup } from "../../shared/save-backup.js";
 import { actionName, analyze, execute, missionError } from "./engine.js";
 import type { Action, Case, Plan } from "./engine.js";
 import { MISSIONS } from "./missions.js";
@@ -20,6 +23,13 @@ const mission = () => MISSIONS[save.activeId - 1];
 
 function persist(): void { storageFailed = !writeSave(key, save); }
 function announce(text: string): void { notice!.textContent = text; }
+function changeChapter(id: number): void {
+  if (id === save.activeId) return;
+  save.chapters = archiveChapter(save);
+  const restored = resumeChapter(save, id, readSave, { best: save.best, solo: save.solo, unlocked: save.unlocked, mode: save.mode });
+  if (restored) Object.assign(save, restored);
+  else startChapter(save, id);
+}
 function actionSelect(index: number, field: "red" | "green", value: Action, label: string): string {
   return `<label>${h(label)}<select data-case="${index}" data-field="${field}" ${save.result ? "disabled" : ""}>
     ${(["keep", "replace"] as const).map((action) => `<option value="${action}" ${action === value ? "selected" : ""}>${actionName(action)}</option>`).join("")}</select></label>`;
@@ -75,8 +85,9 @@ function renderDesk(): string {
     <details data-panel="rules"><summary>费用、工时和检测规则</summary><p>用“点”统一计算检测费、更换费和故障损失。${current.cases.length > 1 ? "各份单共用" : "本章可用"} ${current.budget} 点调查预算、${current.work} 格工时。预算只限制检测与取样，更换费也计入平均损失。</p>
     <p>1 格工时代表一份检查工作量，执行时不需要等待。单台设备最多追加一次检测。检测器标红表示报告异常，可能误报；未标红也可能漏掉故障。</p>
     <p>每份单都要填好方案。工具自动计算概率和平均损失，你决定怎么检查和处理。预算、工时够用就能执行；平均损失较高的方案也可以试，再看哪里需要调整。</p></details></section>
+    ${!save.result && current.cases.length > 1 ? `<div class="planning-status" aria-label="整套方案当前合计"><span>调查 ${fmt(cost)} / ${current.budget} 点 · ${work} / ${current.work} 格<br>平均损失 ${fmt(expected)} / ${current.goal} 点</span><a href="#dispatch">核对整套方案 ↓</a></div>` : ""}
     <div class="job-grid">${current.cases.map(renderCase).join("")}</div>
-    <section class="card dispatch" aria-label="执行整套方案"><div class="metrics"><p>调查费 <strong>${fmt(cost)} / ${current.budget} 点</strong></p>
+    <section class="card dispatch" id="dispatch" tabindex="-1" aria-label="执行整套方案"><div class="metrics"><p>调查费 <strong>${fmt(cost)} / ${current.budget} 点</strong></p>
     <p>调查工时 <strong>${work} / ${current.work} 格</strong></p><p>全部检修单的平均损失 <strong>${fmt(expected)} 点</strong></p></div>
     ${invalid ? `<p class="error" role="alert">${h(invalid)}</p>` : ""}<button class="primary" data-command="execute" ${invalid || save.result ? "disabled" : ""}>执行所有检修单</button>
     <p class="muted">执行后会揭晓检测结果，按你填好的条件更换或保留设备，并列出这次账单。</p></section>`;
@@ -84,7 +95,7 @@ function renderDesk(): string {
 }
 function renderMenu(): string {
   return `<section class="card chapter-menu" aria-labelledby="chapters-title"><h2 id="chapters-title">选择章节</h2>
-    <p>切换章节或重看剧情，会清空当前方案并从头开始引导，成绩和解锁进度保留。重新处理同一章时，设备和检测结果不变。可以提前体验其他章，第一次玩建议从第 1 章开始。</p>
+    <p>切换章节会保留各章的方案和引导步骤。重看剧情只清空本章当前尝试，成绩和解锁进度保留。重新处理同一章时，设备和检测结果不变。可以提前体验其他章，第一次玩建议从第 1 章开始。</p>
     <button data-command="replay">重看本章剧情</button>
     <div class="chapters">${MISSIONS.map((item) => `<button data-chapter="${item.id}" ${item.id === save.activeId ? 'aria-current="true"' : ""}>
     <span>${item.id}. ${h(item.title)}</span><small>${save.best[item.id] ? `最好 ${save.best[item.id]} 星${save.solo[item.id] ? ` · 独立 ${save.solo[item.id]} 星` : " · 使用过提示"}` : item.id <= save.unlocked ? "已解锁" : "可提前体验"}</small></button>`).join("")}</div></section>`;
@@ -110,13 +121,12 @@ function renderManual(): string {
     <p>首版有 8 章基础教学与独立值班。抽样偏差、可信区间、对照实验和长篇综合挑战尚未制作。</p></div></details>`;
 }
 function render(): void {
+  const restore = rememberView(root!);
   const current = mission();
   const inGuide = save.mode === "story" && guideStep(save.guide, current.id) !== "dispatch" && !save.result;
-  const focus = document.activeElement as HTMLElement | null;
-  const field = focus?.dataset.field;
-  const caseIndex = focus?.dataset.case;
   const context = `${current.id}:${inGuide}:${!!save.result}`;
-  const openPanels = context === renderedContext ? [...root!.querySelectorAll<HTMLDetailsElement>("details[data-panel][open]")].map((panel) => panel.dataset.panel) : [];
+  const sameContext = context === renderedContext;
+  const openPanels = sameContext ? [...root!.querySelectorAll<HTMLDetailsElement>("details[data-panel][open]")].map((panel) => panel.dataset.panel) : [];
   renderedContext = context;
   root!.innerHTML = `<header class="site-header"><a href="../../${testMode ? "?test=1" : ""}" class="brand"><span class="brand-mark" aria-hidden="true">修</span><span>街区检修站<small>知游 · 概率与统计推断</small></span></a>
     <nav aria-label="检修站菜单"><button data-command="menu" aria-expanded="${menu}">章节与成绩</button><button data-command="mode">${save.mode === "story" ? "进入检修桌" : "回到剧情引导"}</button></nav></header>
@@ -124,9 +134,9 @@ function render(): void {
     ${menu ? renderMenu() : ""}${inGuide ? renderGuide(save.guide, current) : renderDesk()}
     <div class="reference-tools">${inGuide ? "" : renderHints(current, save.hintLevel, hintsOpen)}${renderManual()}</div>
     <footer><p>${testMode ? "当前使用测试档案，与正式进度分开保存。" : "进度自动保存在当前浏览器。"}换设备或换网址后，这里的进度不会跟过去；清理站点数据会删除存档。</p>
-    ${storageFailed ? '<p class="error" role="alert">浏览器未能保存。当前页面仍可游玩，刷新后可能丢失本次进度。</p>' : ""}</footer></main>`;
+    ${storageFailed ? '<p class="error" role="alert">浏览器未能保存。当前页面仍可游玩，刷新后可能丢失本次进度。</p>' : ""}${backupControls()}</footer></main>`;
   for (const panel of root!.querySelectorAll<HTMLDetailsElement>("details[data-panel]")) if (openPanels.includes(panel.dataset.panel)) panel.open = true;
-  if (field && caseIndex !== undefined) root!.querySelector<HTMLElement>(`[data-case="${caseIndex}"][data-field="${field}"]`)?.focus();
+  if (sameContext) restore();
 }
 root.addEventListener("change", (event) => {
   const target = event.target;
@@ -151,7 +161,7 @@ root.addEventListener("click", (event) => {
   const current = mission();
   let focusTarget = "#desk";
   try {
-    if (button.dataset.chapter) { startChapter(save, Number(button.dataset.chapter)); menu = false; hintsOpen = false; }
+    if (button.dataset.chapter) { changeChapter(Number(button.dataset.chapter)); menu = false; hintsOpen = save.hintLevel > 0; }
     else if (button.dataset.guide) {
       guideAction(save.guide, current.id, button.dataset.guide);
       focusTarget = `[data-guide="${button.dataset.guide}"]`;
@@ -159,7 +169,7 @@ root.addEventListener("click", (event) => {
       switch (button.dataset.command) {
         case "menu": menu = !menu; focusTarget = menu ? "#chapters-title" : "#desk"; break;
         case "mode": save.mode = save.mode === "story" ? "desk" : "story"; break;
-        case "replay": startChapter(save, current.id); save.mode = "story"; menu = false; hintsOpen = false; break;
+        case "replay": delete save.chapters?.[current.id]; startChapter(save, current.id); save.mode = "story"; menu = false; hintsOpen = false; break;
         case "advance": advanceGuide(save.guide, current.id); focusTarget = guideStep(save.guide, current.id) === "dispatch" ? "#desk" : "#guide-title"; break;
         case "hint":
           hintsOpen = !hintsOpen;
@@ -173,7 +183,7 @@ root.addEventListener("click", (event) => {
           focusTarget = "#result-title";
           break;
         case "retry": save.result = null; save.guide.step = guideLength(current.id); break;
-        case "next": startChapter(save, current.id + 1); hintsOpen = false; break;
+        case "next": changeChapter(current.id + 1); hintsOpen = save.hintLevel > 0; break;
         default: return;
       }
     }
@@ -189,3 +199,6 @@ root.addEventListener("click", (event) => {
 });
 persist();
 render();
+installBackup(root, "probability", readSave, () => save, (next) => {
+  Object.assign(save, next); menu = false; hintsOpen = save.hintLevel > 0; persist(); render();
+}, announce);

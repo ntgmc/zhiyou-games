@@ -1,4 +1,7 @@
 import { escapeHtml as h } from "../../shared/html.js";
+import { rememberView } from "../../shared/view-state.js";
+import { archiveChapter, resumeChapter } from "../../shared/chapter-drafts.js";
+import { backupControls, installBackup } from "../../shared/save-backup.js";
 import { adjust, analyze, cutFor, execute, moves, placeName, routeError, targets, walk } from "./engine.js";
 import type { Analysis, Mission } from "./engine.js";
 import { MISSIONS } from "./missions.js";
@@ -15,6 +18,7 @@ let menu = false;
 let storageFailed = false;
 let hintsOpen = save.hintLevel > 0;
 let noticeTimer = 0;
+let renderedMission = 0;
 const mission = (): Mission => MISSIONS[save.activeId - 1];
 const pathName = (nodes: readonly string[]): string => nodes.map((id) => placeName(mission(), id)).join(" → ");
 const announce = (text: string): void => {
@@ -23,6 +27,14 @@ const announce = (text: string): void => {
   noticeTimer = window.setTimeout(() => { notice!.textContent = ""; }, 4000);
 };
 const persist = (): void => { storageFailed = !writeSave(key, save); };
+
+function changeChapter(id: number): void {
+  if (id === save.activeId) return;
+  save.chapters = archiveChapter(save);
+  const restored = resumeChapter(save, id, readSave, { best: save.best, solo: save.solo, unlocked: save.unlocked, mode: save.mode });
+  if (restored) Object.assign(save, restored);
+  else startChapter(save, id);
+}
 
 function renderMap(analysis: Analysis, editing: boolean): string {
   const current = mission();
@@ -199,24 +211,29 @@ function renderManual(): string {
 }
 
 function render(): void {
+  const restore = rememberView(root!);
   const current = mission();
-  const opened = new Set([...root!.querySelectorAll<HTMLDetailsElement>("details[id][open]")].map((details) => details.id));
+  const sameMission = renderedMission === current.id;
+  const opened = new Set(sameMission ? [...root!.querySelectorAll<HTMLDetailsElement>("details[id][open]")].map((details) => details.id) : []);
   root!.innerHTML = `<header class="site-header"><a class="brand" href="../../${testMode ? "?test=1" : ""}" aria-label="返回知游游戏目录"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M6 22 16 8l10 14M6 22h20M16 8v14" /><circle cx="6" cy="22" r="3" /><circle cx="16" cy="8" r="3" /><circle cx="26" cy="22" r="3" /></svg></span><span>山城补给网<small>知游 · 图论与网络优化</small></span></a>
     <nav aria-label="补给网菜单"><button data-command="menu" aria-expanded="${menu}">章节与成绩</button>
     <button data-command="mode">${save.mode === "story" ? "自由调度" : "回到剧情引导"}</button></nav></header>
     <main id="desk" tabindex="-1"><div class="chapter-line"><span>山城运输站 <span aria-hidden="true">/</span> 第 ${String(current.id).padStart(2, "0")} 章</span><span>已通过 ${Object.keys(save.best).length} / ${MISSIONS.length} 章</span></div>
     ${menu ? `<section class="panel chapter-menu"><div class="panel-body"><div class="menu-heading"><h2 id="chapters-title">章节与成绩</h2><button class="text-button" data-command="menu">收起章节</button></div>
-    <p class="muted">切换章节或重看剧情，会清除本次路线、分界选择和引导步骤。已有成绩和解锁进度保留。每章都可以提前体验，第一次玩建议从第一章开始。</p>
+    <p class="muted">切换章节会保留各章的路线、分界选择和引导步骤。重看剧情只清除本章当前尝试，已有成绩和解锁进度保留。每章都可以提前体验，第一次玩建议从第一章开始。</p>
     <button data-command="replay">重看本章剧情</button><div class="chapters">${MISSIONS.map((item) => `<button data-chapter="${item.id}" ${item.id === current.id ? 'aria-current="true"' : ""}>
     <span class="chapter-number">${String(item.id).padStart(2, "0")}</span><span>${h(item.title)}<small>${save.best[item.id] ? `${save.best[item.id]} 星 · ${save.solo[item.id] ? "独立通过" : "参考提示通过"}` : item.id <= save.unlocked ? "已解锁" : "可提前体验"}</small></span></button>`).join("")}</div></div></section>` : ""}
     ${renderPlay()}<footer>${renderManual()}<p>${testMode ? "当前使用测试存档，不影响正式进度。" : "路线、引导和成绩自动保存在当前浏览器。"}换设备或网址不会同步进度；清理站点数据会删除存档。</p>
-    ${storageFailed ? '<p class="error" role="alert">这次未能保存。你仍可继续操作，但刷新或关闭页面可能丢失本次进度。</p>' : ""}</footer></main>`;
+    ${storageFailed ? '<p class="error" role="alert">这次未能保存。你仍可继续操作，但刷新或关闭页面可能丢失本次进度。</p>' : ""}${backupControls()}</footer></main>`;
   for (const details of root!.querySelectorAll<HTMLDetailsElement>("details[id]")) if (opened.has(details.id)) details.open = true;
+  if (sameMission) restore();
+  renderedMission = current.id;
 }
 
 function updateInput(event: Event): void {
   const input = event.target;
   if (!(input instanceof HTMLInputElement) || save.result) return;
+  if (input.type !== "number" && !input.dataset.cut) return;
   if (event.type === "input" && input.type !== "number") return;
   if (input.dataset.cut) {
     save.side = input.checked ? [...save.side, input.dataset.cut] : save.side.filter((id) => id !== input.dataset.cut);
@@ -250,7 +267,7 @@ root.addEventListener("click", (event) => {
     if (button.dataset.command === "add" || button.dataset.command === "execute") {
       if (root!.querySelector('input[type="number"][aria-invalid="true"]')) throw new Error("请先修改标出的箱数，输入 1 到 100 之间的整数。");
     }
-    if (button.dataset.chapter) { startChapter(save, Number(button.dataset.chapter)); menu = false; hintsOpen = false; }
+    if (button.dataset.chapter) { changeChapter(Number(button.dataset.chapter)); menu = false; hintsOpen = save.hintLevel > 0; }
     else if (button.dataset.remove !== undefined && !save.result) {
       save.routes.splice(Number(button.dataset.remove), 1); save.codes = []; focusTarget = "#routes-title";
     } else if ((button.dataset.node || button.dataset.move) && !save.result) {
@@ -267,7 +284,7 @@ root.addEventListener("click", (event) => {
       switch (button.dataset.command) {
         case "menu": menu = !menu; focusTarget = menu ? "#chapters-title" : "#desk"; break;
         case "mode": save.mode = save.mode === "story" ? "desk" : "story"; break;
-        case "replay": startChapter(save, current.id); save.mode = "story"; menu = false; hintsOpen = false; break;
+        case "replay": delete save.chapters?.[current.id]; startChapter(save, current.id); save.mode = "story"; menu = false; hintsOpen = false; break;
         case "advance": advanceGuide(save.guide, current, save.routes, save.side); break;
         case "capacity-test": save.guide.observed = true; break;
         case "route-mode": case "residual-mode":
@@ -296,7 +313,7 @@ root.addEventListener("click", (event) => {
           save.hintLevel = Math.min(3, save.hintLevel + 1); save.hinted = true; hintsOpen = true; focusTarget = "#hint-content"; break;
         case "execute": save.result = execute(current, save.routes, save.side); recordScore(save); focusTarget = "#result-title"; break;
         case "retry": save.result = null; save.guide.step = guideLength(current.id); save.codes = []; break;
-        case "next": startChapter(save, current.id + 1); hintsOpen = false; break;
+        case "next": changeChapter(current.id + 1); hintsOpen = save.hintLevel > 0; break;
         default: return;
       }
     }
@@ -312,3 +329,6 @@ root.addEventListener("click", (event) => {
 });
 persist();
 render();
+installBackup(root, "network", readSave, () => save, (next) => {
+  Object.assign(save, next); menu = false; hintsOpen = save.hintLevel > 0; persist(); render();
+}, announce);

@@ -186,6 +186,10 @@ details > p, details li { font-size: .86rem; }
 .manual-content p { font-size: .87rem; }
 .formula { padding: .8rem; border: 1px solid var(--line); border-radius: 6px; overflow-wrap: anywhere; }
 footer { padding: 1rem 0; }
+.planning-status { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: .7rem; padding: .65rem .85rem; margin-bottom: 1rem; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; font-size: .8rem; box-shadow: 0 3px 12px #243b3618; }
+.planning-status a { white-space: nowrap; }
+.planning-status ~ .job-grid select { scroll-margin-top: 6rem; }
+#dispatch { scroll-margin-top: 6rem; }
 #notice { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); max-width: min(90vw, 650px); background: var(--ink); color: white; border-radius: 5px; padding: .4rem .9rem; font-size: .8rem; pointer-events: none; box-shadow: 0 3px 12px #243b3620; }
 #notice:empty { display: none; }
 @media (max-width: 850px) {

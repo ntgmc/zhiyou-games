@@ -3,6 +3,7 @@ import type { Plan, Session } from "./engine.js";
 import { MISSIONS } from "./missions.js";
 import { freshGuide, readGuide } from "./story.js";
 import type { Guide } from "./story.js";
+import { readChapters, type ChapterDrafts } from "../../shared/chapter-drafts.js";
 
 export interface Save {
   version: 1;
@@ -15,6 +16,7 @@ export interface Save {
   review: boolean;
   mode: "story" | "desk";
   guide: Guide;
+  chapters?: ChapterDrafts;
 }
 export const SAVE_KEY = "tidal-harbor-save-v1";
 export function freshSave(): Save {
@@ -33,6 +35,8 @@ export function readSave(key: string, storage?: Pick<Storage, "getItem">): Save 
       }
     }
     const mission = MISSIONS[data.activeId - 1];
+    const chapters = readChapters(data.chapters, MISSIONS.length);
+    if (chapters) fallback.chapters = chapters;
     // A damaged current voyage must not erase already validated achievements.
     fallback.activeId = mission.id;
     fallback.best = data.best;
@@ -52,7 +56,8 @@ export function readSave(key: string, storage?: Pick<Storage, "getItem">): Save 
     }
     return { version: 1, activeId: mission.id, best: data.best, solo: data.solo, session, draft: data.draft, hintLevel: data.hintLevel,
       review: history.length > 0 && (data.review || session.status !== "playing"), mode: data.mode === "desk" ? "desk" : data.mode === "story" ? "story" : "desk",
-      guide: readGuide(data.guide, mission.id, history.length > 0 || data.mode === undefined) };
+      guide: readGuide(data.guide, mission.id, history.length > 0 || data.mode === undefined),
+      ...(fallback.chapters ? { chapters: fallback.chapters } : {}) };
   } catch {
     return fallback;
   }

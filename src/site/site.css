@@ -90,9 +90,11 @@ h2 { font-size: 28px; font-weight: 500; margin-top: 7px; text-wrap: balance; }
 h3 { font-size: 30px; font-weight: 500; margin: 17px 0 12px; }
 .game-copy > p { font-size: 13px; color: var(--muted); max-width: 430px; line-height: 1.95; }
 .game-tags { display: flex; flex-wrap: wrap; list-style: none; padding: 0; margin: 20px 0 27px; gap: 7px; }
-.game-tags li { font-size: 10px; color: #58674f; background: #f0f2e9; border: 1px solid #dce2d4; padding: 4px 10px; border-radius: 3px; }
+.game-tags li { font-size: 12px; color: #58674f; background: #f0f2e9; border: 1px solid #dce2d4; padding: 4px 10px; border-radius: 3px; }
 .game-bottom { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.game-bottom > span { color: var(--muted); font-size: 11px; }
+.game-bottom > span { color: var(--muted); font-size: 13px; }
+.game-copy > .first-task { margin-top: 12px; color: var(--green); }
+.catalog-guidance { margin: -10px 0 24px; color: var(--muted); font-size: 13px; }
 .play-link { font-size: 13px; color: var(--green); white-space: nowrap; }
 .play-link > span { margin-left: 12px; }
 .about { padding: 10px 0 58px; display: grid; grid-template-columns: 1fr 1.8fr; gap: 60px; }
@@ -134,11 +136,19 @@ h3 { font-size: 30px; font-weight: 500; margin: 17px 0 12px; }
 @media (max-width: 760px) {
   .site-header, main, .site-footer { padding-left: 22px; padding-right: 22px; }
   .site-header { min-height: 80px; flex-wrap: wrap; gap: 20px; padding-top: 20px; padding-bottom: 20px; }.site-brand small { display: none; }.site-header nav { gap: 12px 18px; }
-  .hero { gap: 15px; padding: 50px 0; grid-template-columns: 1fr; }
-  .knowledge-art { max-width: 380px; width: 100%; margin: 5px auto 0; }.hero-copy > p { max-width: 520px; }
-  .principles { gap: 16px; }.principles > div { flex-direction: column; gap: 6px; }
-  .game-card { grid-template-columns: 1fr; }.game-art { min-height: 280px; }.signal-orbit { min-height: 190px; }
-  .game-copy { padding: 27px 24px; }.about { grid-template-columns: 1fr; gap: 14px; }.game-bottom { flex-wrap: wrap; }
+  .hero { gap: 15px; padding: 24px 0; grid-template-columns: 1fr; }
+  .knowledge-art, .principles, .game-art { display: none; }
+  .catalog-section { padding-top: 28px; }
+  .hero-copy > p { max-width: 520px; }
+  .game-card { grid-template-columns: 1fr; }
+  .game-copy { padding: 22px; }.about { grid-template-columns: 1fr; gap: 14px; }.game-bottom { flex-wrap: wrap; }
+  .section-heading { margin-bottom: 18px; gap: 12px; }
+  .catalog-guidance { margin: 0 0 18px; line-height: 1.6; }
+  .game-copy h3 { order: 1; }
+  .game-bottom { order: 2; margin: 0 0 12px; padding: 0 0 12px; border-top: 0; border-bottom: 1px solid var(--line); }
+  .game-copy > p { order: 3; }
+  .game-tags { order: 4; margin: 16px 0 0; }
+  .play-link { display: inline-flex; align-items: center; min-height: 44px; }
   .site-footer { gap: 20px; }.site-footer small { max-width: 140px; }
   .info-page { padding-top: 36px; padding-bottom: 40px; }
   .status-list, .release-facts { grid-template-columns: 1fr; }

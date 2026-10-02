@@ -3,6 +3,7 @@ import type { Result, Route } from "./engine.js";
 import { MISSIONS } from "./missions.js";
 import { freshGuide, readGuide } from "./story.js";
 import type { Guide } from "./story.js";
+import { readChapters, type ChapterDrafts } from "../../shared/chapter-drafts.js";
 
 export interface Save {
   version: 1;
@@ -20,6 +21,7 @@ export interface Save {
   hintLevel: number;
   hinted: boolean;
   result: Result | null;
+  chapters?: ChapterDrafts;
 }
 export const SAVE_KEY = "mountain-network-save-v1";
 export function freshSave(): Save {
@@ -56,6 +58,8 @@ export function readSave(key: string, storage?: Pick<Storage, "getItem">): Save 
   try {
     const data = JSON.parse((storage ?? localStorage).getItem(key) ?? "null");
     if (!data || data.version !== 1) return save;
+    const chapters = readChapters(data.chapters, MISSIONS.length);
+    if (chapters) save.chapters = chapters;
     save.best = scores(data.best);
     save.solo = scores(data.solo);
     for (const id of Object.keys(save.solo)) if ((save.best[id] ?? 0) < save.solo[id]) delete save.solo[id];

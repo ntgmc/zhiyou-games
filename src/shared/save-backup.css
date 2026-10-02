@@ -1,0 +1,7 @@
+.save-backup { margin: 1rem 0; font-size: .85rem; }
+.save-backup summary { cursor: pointer; }
+.save-backup p { margin: .7rem 0; }
+.save-backup label { display: block; margin: .7rem 0; }
+.save-backup input { display: block; max-width: 100%; margin-top: .4rem; }
+.save-backup button { padding: .5rem .7rem; border: 1px solid currentColor; border-radius: 4px; color: inherit; background: transparent; cursor: pointer; }
+.save-backup [hidden] { display: none; }

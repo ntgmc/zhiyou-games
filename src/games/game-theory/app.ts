@@ -1,4 +1,7 @@
 import { escapeHtml as h } from "../../shared/html.js";
+import { rememberView } from "../../shared/view-state.js";
+import { archiveChapter, resumeChapter } from "../../shared/chapter-drafts.js";
+import { backupControls, installBackup } from "../../shared/save-backup.js";
 import { ACTIONS, actionName, analyze, contractMatrix, cooperationCount, createSession, defaultPlan, planError, settle, stars, validPlan } from "./engine.js";
 import type { Analysis, Matrix, Plan, Round } from "./engine.js";
 import { MANUAL, MISSIONS } from "./missions.js";
@@ -15,6 +18,7 @@ const desktop = matchMedia("(min-width: 64rem)");
 let save = readSave(key);
 let error = "";
 let storageFailed = false;
+let renderedMission = 0;
 const fmt = (amount: number): string => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount);
 const signed = (amount: number): string => `${amount > 0 ? "+" : ""}${fmt(amount)}`;
 const persist = (): void => { storageFailed = !writeSave(key, { ...save, draft: validPlan(save.draft) ? save.draft : defaultPlan() }); };
@@ -61,10 +65,10 @@ function navigation(): string {
         <span class="chapter-number">${String(mission.id).padStart(2, "0")}</span><span>${h(mission.title)}</span><span class="chapter-score" aria-label="${save.best[mission.id] ? `${save.best[mission.id]} 星${save.solo[mission.id] ? "，独立通过" : ""}` : "尚未通过"}">${save.best[mission.id] ? `${"★".repeat(save.best[mission.id])}${save.solo[mission.id] ? " ·" : ""}` : "—"}</span>
       </button>`).join("")}</nav>
       <div class="chapter-shortcuts"><button type="button" data-mission="9">进入进阶航线</button><button type="button" data-mission="13">进入综合值班</button></div>
-      <small>可直接进入任意章。切换后从所选章节第一班开始，当前排班进度不保留，已有成绩保留。</small>
+      <small>可直接进入任意章。切换会保留各章排班、草稿和引导，回来后接着玩。重开或重看只重置本章当前尝试，已有成绩保留。</small>
     </details>
     <div class="sidebar-tools"><button type="button" data-open="manual">航运手册 <span aria-hidden="true">↗</span></button>${guiding() ? "" : '<button type="button" data-open="lab">博弈实验台 <span aria-hidden="true">↗</span></button>'}</div>
-    <p class="local-note">${storageFailed ? "浏览器未能保存进度。请先保留页面，允许站点存储后再试。" : "浏览器会自动保存行动和草稿。换设备、换网址或清理站点数据后，可能无法继续原有进度。"}${testing ? "<br>当前使用独立测试存档。" : ""}</p></aside>`;
+    <p class="local-note">${storageFailed ? "浏览器未能保存进度。请先保留页面，允许站点存储后再试。" : "浏览器会自动保存行动和草稿。换设备、换网址或清理站点数据后，可能无法继续原有进度。"}${testing ? "<br>当前使用独立测试存档。" : ""}</p>${backupControls()}</aside>`;
 }
 function conditions(round: Round): string {
   const mission = MISSIONS[save.activeId - 1];
@@ -73,10 +77,10 @@ function conditions(round: Round): string {
       <thead><tr><th scope="col">班次 / 状态</th><th scope="col">双方错峰</th><th scope="col">各自单独抢先</th><th scope="col">双方抢先</th><th scope="col">周转金</th><th scope="col">每方手续费</th><th scope="col">替代航线</th></tr></thead>
       <tbody>${mission.rounds.map((item, index) => `<tr><th scope="row">${index + 1}. ${h(item.title)}<small>${index < save.session.history.length ? "已结算" : index === save.session.step ? "当前待排" : "后续订单"}${item.continuation !== undefined ? ` · 延续 ${item.continuation * 100}%` : ""}</small></th><td>${item.matrix[0].join(" / ")}</td><td>${item.matrix[2][0]} / ${item.matrix[1][1]}</td><td>${item.matrix[3].join(" / ")}</td><td>${item.reserve.join(" / ")}</td><td>${item.fee}</td><td>${item.outside.join(" / ")}</td></tr>`).join("")}</tbody></table></div>
     <p class="helper">表中收益尚未扣合同手续费、没收的保证金或合作分账。未来订单可提前查看，但须按班次执行。</p><div class="forecast">
-    ${MISSIONS[save.activeId - 1].rounds.map((item, index) => `<section><h3>${index + 1}. ${h(item.title)}</h3><p>${h(item.briefing)}</p>
+    ${MISSIONS[save.activeId - 1].rounds.map((item, index) => `<details id="forecast-${index}"><summary>${index + 1}. ${h(item.title)} · 查看本班条件</summary><p>${h(item.briefing)}</p>
       <p class="compact">未扣合同费用时，双方错峰赚 ${item.matrix[0].join(" / ")}；各自单方违约赚 ${item.matrix[2][0]} / ${item.matrix[1][1]}；双方抢先赚 ${item.matrix[3].join(" / ")}。<br>须留运营周转金 ${item.reserve.join(" / ")}；手续费每方 ${item.fee}；替代航线收益 ${item.outside.join(" / ")}。各组数字均为你 / 岑舟。</p>
       <details><summary>查看该班原始收益（未扣合同费用）</summary>${matrixTable(item.matrix)}</details>
-    </section>`).join("")}</div></details>
+    </details>`).join("")}</div></details>
     <p class="rule-note">${round.continuation !== undefined
       ? "本章没有固定终点，计算整段合作关系的期望收益，不随机抽取轮数，也不改变可用现金。"
       : "双方各自提交行动，同时揭晓。岑舟作决定时，看不到你尚未揭晓的选择。"}</p>`;
@@ -148,8 +152,9 @@ function review(): string {
   </section>`;
 }
 function render(): void {
-  const detailStates = new Map(Array.from(app.querySelectorAll<HTMLDetailsElement>("details[id]"), (item) => [item.id, item.open]));
-  const focusId = (document.activeElement as HTMLElement | null)?.id;
+  const restore = rememberView(app);
+  const sameMission = renderedMission === save.activeId;
+  const detailStates = new Map(sameMission ? Array.from(app.querySelectorAll<HTMLDetailsElement>("details[id]"), (item) => [item.id, item.open]) : []);
   const mission = MISSIONS[save.activeId - 1];
   const session = save.session;
   const step = Math.min(save.review ? session.history.length - 1 : session.step, mission.rounds.length - 1);
@@ -182,16 +187,21 @@ function render(): void {
       </details>`}
     </main><footer>潮汐港：合约与对手 <span>${stage(mission.id)}</span></footer></div>`;
   for (const item of app.querySelectorAll<HTMLDetailsElement>("details[id]")) if (detailStates.has(item.id)) item.open = detailStates.get(item.id)!;
-  if (focusId) document.getElementById(focusId)?.focus({ preventScroll: true });
+  if (sameMission) restore();
+  renderedMission = save.activeId;
 }
 desktop.addEventListener("change", (event) => {
   const chapters = app.querySelector<HTMLDetailsElement>("#chapters");
   if (chapters) chapters.open = event.matches;
 });
-function start(id: number): void {
+function start(id: number, reset = false): void {
   const mission = MISSIONS.find((item) => item.id === id);
   if (!mission) return;
-  save = { ...save, activeId: id, session: createSession(mission), draft: defaultPlan(), hintLevel: 0, review: false, guide: freshGuide() };
+  if (id === save.activeId && !reset) return;
+  if (reset) delete save.chapters?.[id];
+  else save.chapters = archiveChapter({ ...save, draft: validPlan(save.draft) ? save.draft : defaultPlan() });
+  save = (!reset && resumeChapter(save, id, readSave, { best: save.best, solo: save.solo, mode: save.mode })) ||
+    { ...save, activeId: id, session: createSession(mission), draft: defaultPlan(), hintLevel: 0, review: false, guide: freshGuide() };
   error = "";
   persist(); render();
   document.querySelector<HTMLElement>("h1")?.scrollIntoView({ block: "start" });
@@ -254,8 +264,8 @@ app.addEventListener("click", (event) => {
     save.mode = save.mode === "story" ? "desk" : "story";
     error = ""; persist(); render(); return;
   }
-  if (button.dataset.command === "replay") { save.mode = "story"; start(save.activeId); return; }
-  if (button.dataset.command === "restart") { start(save.activeId); return; }
+  if (button.dataset.command === "replay") { save.mode = "story"; start(save.activeId, true); return; }
+  if (button.dataset.command === "restart") { start(save.activeId, true); return; }
   if (button.dataset.answer || button.dataset.command?.startsWith("guide-")) {
     if (!guiding()) return;
     const mission = MISSIONS[save.activeId - 1];
@@ -325,3 +335,6 @@ dialog.addEventListener("change", (event) => {
 persist();
 render();
 if (storageFailed) notice.textContent = "浏览器未能保存进度。你可以继续玩，但刷新页面可能丢失进度。";
+installBackup(app, "game-theory", readSave, () => ({ ...save, draft: validPlan(save.draft) ? save.draft : defaultPlan() }), (next) => {
+  save = next; error = ""; persist(); render();
+}, (text) => { notice.textContent = text; });
