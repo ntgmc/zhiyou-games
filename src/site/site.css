@@ -46,6 +46,18 @@ h1 em { font-style: normal; color: #608158; }
 h2 { font-size: 28px; font-weight: 500; margin-top: 7px; text-wrap: balance; }
 .section-heading > span { font: 11px Consolas, monospace; color: var(--muted); white-space: nowrap; }
 .game-card { display: grid; grid-template-columns: .9fr 1.15fr; border: 1px solid var(--line); background: #fbfcf6; border-radius: 8px; overflow: hidden; }
+#game-catalog { display: grid; gap: 28px; }
+.game-art.harbor-art { background: #e0e9e3; color: #304c48; }
+.harbor-art .art-label > span, .harbor-art .art-caption > span { color: #536e63; }
+.harbor-cover { position: relative; flex: 1; min-height: 220px; }
+.cover-route { position: absolute; left: 5%; right: 18%; top: 50%; border-top: 1px dashed #78948b; }
+.cover-dock { position: absolute; right: 5%; top: 12%; bottom: 12%; width: 10%; border: 1px solid #94a18d; background: #d4dac9; }
+.cover-dock::before, .cover-dock::after { content: ""; position: absolute; right: 0; width: 75px; height: 26px; background: #d4dac9; border: 1px solid #94a18d; }
+.cover-dock::before { top: 15%; }.cover-dock::after { bottom: 15%; }
+.cover-boat { position: absolute; width: 85px; height: 34px; clip-path: polygon(0 0, 75% 0, 100% 50%, 75% 100%, 0 100%); }
+.boat-white { background: #315952; top: 22%; left: 20%; }.boat-other { background: #8d8467; bottom: 18%; left: 40%; }
+.cover-label, .cover-payoff { position: absolute; font-size: 11px; letter-spacing: 2px; color: #536e63; }
+.cover-label { left: 6%; bottom: 0; }.cover-payoff { left: 43%; top: 44%; padding: 0 8px; background: #e0e9e3; }
 .game-art { background: #102630; color: #c5dcd8; min-height: 330px; display: flex; flex-direction: column; padding: 24px; position: relative; overflow: hidden; }
 .art-label { display: flex; justify-content: space-between; font: 9px Consolas, monospace; letter-spacing: 1.5px; z-index: 1; }
 .art-label > span { color: #7aa69c; }

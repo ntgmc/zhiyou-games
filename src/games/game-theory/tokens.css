@@ -1,0 +1,37 @@
+:root {
+  color-scheme: light;
+  --color-paper: oklch(96% 0.014 85);
+  --color-paper-2: oklch(93% 0.018 85);
+  --color-paper-3: oklch(90% 0.018 85);
+  --color-surface: oklch(98% 0.009 85);
+  --color-ink: oklch(27% 0.022 75);
+  --color-muted: oklch(45% 0.017 75);
+  --color-rule: oklch(79% 0.021 85);
+  --color-control: oklch(54% 0.027 85);
+  --color-accent: oklch(45% 0.114 42);
+  --color-accent-ink: oklch(98% 0.009 85);
+  --color-focus: oklch(60% 0.114 42);
+  --color-error: oklch(43% 0.16 28);
+  --color-sea: oklch(92% 0.024 190);
+  --color-sea-line: oklch(83% 0.031 190);
+  --color-sea-ink: oklch(37% 0.04 190);
+  --color-ship: oklch(43% 0.042 190);
+  --color-ship-other: oklch(53% 0.035 85);
+  --color-overlay: oklch(27% 0.022 75 / 0.4);
+  --font-display: "Palatino Linotype", "Noto Serif SC", "Songti SC", SimSun, serif;
+  --font-body: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-display: clamp(2rem, 3.5vw, 3rem);
+  --radius-sm: 3px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-micro: 120ms;
+}

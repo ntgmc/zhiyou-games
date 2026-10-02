@@ -32,12 +32,25 @@ async function verify() {
     throw new Error("The information game page or its canonical URL is missing.");
   }
   const gameAppUrl = new URL(gameModule, gameUrl);
+  const harborUrl = new URL("games/game-theory/", site);
+  const harborHtml = await (await get(harborUrl)).text();
+  const harborModule = harborHtml.match(/src="([^"]+\/src\/games\/game-theory\/app\.js)"/)?.[1];
+  const harborCss = harborHtml.match(/href="([^"]+\/src\/games\/game-theory\/game\.css)"/)?.[1];
+  const harborTokens = harborHtml.match(/href="([^"]+\/src\/games\/game-theory\/tokens\.css)"/)?.[1];
+  if (!harborModule || !harborCss || !harborTokens || !harborHtml.includes(`rel="canonical" href="${harborUrl.href}"`)) {
+    throw new Error("The game theory page or its canonical URL is missing.");
+  }
+  const harborAppUrl = new URL(harborModule, harborUrl);
   const checks = [
     [appUrl, /(?:javascript|ecmascript)/],
     [cssUrl, /text\/css/],
     [gameAppUrl, /(?:javascript|ecmascript)/],
     [new URL(gameCss, gameUrl), /text\/css/],
     [new URL("./audio.js", gameAppUrl), /(?:javascript|ecmascript)/],
+    [harborAppUrl, /(?:javascript|ecmascript)/],
+    [new URL(harborCss, harborUrl), /text\/css/],
+    [new URL(harborTokens, harborUrl), /text\/css/],
+    ...["engine", "missions", "storage"].map((name) => [new URL(`./${name}.js`, harborAppUrl), /(?:javascript|ecmascript)/]),
     [new URL("../../assets/share-card.png", appUrl), /image\/png/],
     ...["orbit", "code", "storm", "arrival"].map((id) =>
       [new URL(`../../../assets/music/${id}.mp3`, gameAppUrl), /^audio\/(?:mpeg|mp3)(?:;|$)/]),
