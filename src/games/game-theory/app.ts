@@ -23,7 +23,7 @@ const fmt = (amount: number): string => new Intl.NumberFormat("zh-CN", { maximum
 const signed = (amount: number): string => `${amount > 0 ? "+" : ""}${fmt(amount)}`;
 const persist = (): void => { storageFailed = !writeSave(key, { ...save, draft: validPlan(save.draft) ? save.draft : defaultPlan() }); };
 const guiding = (): boolean => save.mode === "story" && !save.review && guideStep(save.guide, MISSIONS[save.activeId - 1], save.session) !== "dispatch";
-const stage = (id: number): string => id <= 8 ? "入门与迁移" : id <= 12 ? "进阶航线" : "综合值班";
+const stage = (id: number): string => id <= 8 ? "入门与迁移" : id <= 12 ? "进阶航线" : id <= 16 ? "综合值班" : id <= 19 ? "新港订单" : "独立交班";
 
 function matrixTable(matrix: Matrix, showEquilibria = false): string {
   return `<table class="payoffs"><caption>左数：白帆（你） · 右数：岑舟 · 单位：金币</caption>
@@ -64,7 +64,7 @@ function navigation(): string {
       <nav aria-label="游戏章节">${MISSIONS.map((mission) => `<button type="button" data-mission="${mission.id}" class="chapter ${mission.id === save.activeId ? "current" : ""}" ${mission.id === save.activeId ? 'aria-current="step"' : ""}>
         <span class="chapter-number">${String(mission.id).padStart(2, "0")}</span><span>${h(mission.title)}</span><span class="chapter-score" aria-label="${save.best[mission.id] ? `${save.best[mission.id]} 星${save.solo[mission.id] ? "，独立通过" : ""}` : "尚未通过"}">${save.best[mission.id] ? `${"★".repeat(save.best[mission.id])}${save.solo[mission.id] ? " ·" : ""}` : "—"}</span>
       </button>`).join("")}</nav>
-      <div class="chapter-shortcuts"><button type="button" data-mission="9">进入进阶航线</button><button type="button" data-mission="13">进入综合值班</button></div>
+      <div class="chapter-shortcuts"><button type="button" data-mission="9">进入进阶航线</button><button type="button" data-mission="13">进入综合值班</button><button type="button" data-mission="17">进入新港订单</button><button type="button" data-mission="20">进入独立交班</button></div>
       <small>可直接进入任意章。切换会保留各章排班、草稿和引导，回来后接着玩。重开或重看只重置本章当前尝试，已有成绩保留。</small>
     </details>
     <div class="sidebar-tools"><button type="button" data-open="manual">航运手册 <span aria-hidden="true">↗</span></button>${guiding() ? "" : '<button type="button" data-open="lab">博弈实验台 <span aria-hidden="true">↗</span></button>'}</div>

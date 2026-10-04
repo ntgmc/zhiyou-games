@@ -1,13 +1,13 @@
 import type { Mission, Pair, Plan, Round } from "./engine.js";
 
-const contract = (deposit: number, transfer = 0): Plan => ({ contract: true, deposit, transfer, reciprocal: false, action: "cooperate" });
-const shipment = (title: string, income: Pair, extra: Pair, reserve: Pair, outside: Pair = [2, 3], fee = 1): Round => ({
+export const contract = (deposit: number, transfer = 0): Plan => ({ contract: true, deposit, transfer, reciprocal: false, action: "cooperate" });
+export const shipment = (title: string, income: Pair, extra: Pair, reserve: Pair, outside: Pair = [2, 3], fee = 1): Round => ({
   title, briefing: `每方手续费 ${fee} 金币；白帆须留 ${reserve[0]}、岑舟须留 ${reserve[1]} 金币周转。双方错峰的原始收益为 ${income.join(" / ")}，替代航线收益为 ${outside.join(" / ")}。完整行动收益见表。`,
   matrix: [income, [1, income[1] + extra[1]], [income[0] + extra[0], 1], [3, 3]], reserve, outside, fee,
 });
-const relationship = (title: string, p: number): Round => ({
-  title, briefing: `这是一段独立合作关系，每班结束以 ${p * 100}% 概率继续，概率和标准收益不变。没有保证金合同。结算整段关系期望，现金不变；下一张报价是另一段关系，互不延续惩罚。`,
-  matrix: [[6, 6], [1, 9], [9, 1], [3, 3]], reserve: [0, 0], outside: [2, 3], fee: 0, continuation: p,
+export const relationship = (title: string, p: number, matrix: Round["matrix"] = [[6, 6], [1, 9], [9, 1], [3, 3]]): Round => ({
+  title, briefing: `这是一段独立合作关系，每班结束以 ${p * 100}% 概率继续，概率和本段收益不变。没有保证金合同。结算整段关系期望，现金不变；下一张报价是另一段关系，互不延续惩罚。`,
+  matrix, reserve: [0, 0], outside: [2, 3], fee: 0, continuation: p,
 });
 
 export const CHALLENGES: readonly Mission[] = [

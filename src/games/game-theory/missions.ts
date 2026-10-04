@@ -1,5 +1,6 @@
 import type { Mission, Plan, Round } from "./engine.js";
 import { CHALLENGES } from "./challenges.js";
+import { VOYAGES } from "./voyages.js";
 
 const plan = (deposit = 0, transfer = 0): Plan => ({ contract: true, deposit, transfer, reciprocal: false, action: "cooperate" });
 const standard = (title: string, briefing: string, overrides: Partial<Round> = {}): Round => ({
@@ -90,6 +91,7 @@ export const MISSIONS: readonly Mission[] = [
     reference: [plan(3), plan(6), plan(6, 2), plan(4)],
   },
   ...CHALLENGES,
+  ...VOYAGES,
 ];
 
 export const MANUAL = [

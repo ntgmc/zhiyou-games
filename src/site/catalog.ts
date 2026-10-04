@@ -34,7 +34,7 @@ export const GAMES: readonly GameEntry[] = [
     saveKey: "tidal-harbor-save-v1",
     testKey: "tidal-harbor-test-v1",
     tags: ["最佳回应", "纳什均衡", "可信承诺", "重复博弈"],
-    chapters: 16,
+    chapters: 24,
     chapterLabel: "章",
     href: "./games/game-theory/",
   },

@@ -17,7 +17,7 @@ function run(mission, plans) {
 }
 
 test("the expanded campaign has complete independent tasks, open forecasts and executable three-star references", () => {
-  assert.equal(MISSIONS.length, 16);
+  assert.equal(MISSIONS.length, 24);
   for (const mission of MISSIONS.slice(8)) {
     assert.equal(mission.reference.length, mission.rounds.length);
     assert.equal(mission.hints.length, 3);
@@ -31,6 +31,7 @@ test("the expanded campaign has complete independent tasks, open forecasts and e
     assert.equal(stars(finished, mission), 3);
     assert.equal(finished.total[0], mission.goal);
     assert.equal(resultFeedback(finished, mission).failure, "");
+    assert.ok(resultFeedback(finished, mission).reply, `chapter ${mission.id} needs a success response`);
   }
 });
 
