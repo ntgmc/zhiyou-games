@@ -60,7 +60,7 @@ export const GAMES: readonly GameEntry[] = [
     saveKey: "mountain-network-save-v1",
     testKey: "mountain-network-test-v1",
     tags: ["最短路径", "最大流", "残量网络", "最小割"],
-    chapters: 8,
+    chapters: 24,
     chapterLabel: "章",
     href: "./games/network/",
   },

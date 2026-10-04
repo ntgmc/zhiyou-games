@@ -70,6 +70,7 @@ main { max-width: 1380px; margin: auto; padding: 0 2rem 1.5rem; }
 .map-panel .map-scroll { margin: .85rem .85rem 0; }
 .map-scroll { overflow-x: auto; scrollbar-width: thin; }
 .network-map { position: relative; width: 100%; min-width: 620px; aspect-ratio: 700 / 420; background: var(--map); border-radius: 5px; overflow: hidden; }
+.network-map.wide { min-width: 1000px; aspect-ratio: 1000 / 600; }
 .network-map svg { display: block; width: 100%; height: 100%; }
 .hill { fill: none; stroke: #dce5cb; stroke-width: 80; opacity: .55; stroke-linejoin: round; }
 .contour { fill: none; stroke: #d0dbc3; stroke-width: 1; opacity: .65; }
@@ -93,6 +94,11 @@ marker path { fill: #56786a; }
 .legend-road.reverse { border-color: #a16333; border-top-style: dashed; }
 .legend-road.crossing { border-color: #b17032; }
 .mobile-map-note { display: none; color: var(--muted); font-size: .75rem; margin: .6rem .9rem 0; }
+.wide-map-note { display: block; }
+.planning-status { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: .7rem; margin-bottom: 1rem; padding: .65rem .8rem; background: #fffefa; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 3px 12px #243b3618; font-size: .75rem; }
+.planning-status a { flex-shrink: 0; }
+.station-status { white-space: nowrap; }
+#routes-title, .route-row input, .builder input { scroll-margin-top: 7rem; }
 .segmented { display: flex; gap: 3px; padding: 3px; background: #eef1e7; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 1rem; }
 .segmented button { flex: 1; padding: .4rem; background: transparent; border-color: transparent; font-size: .82rem; }
 .segmented [aria-pressed="true"] { background: var(--paper); border-color: #a5b798; color: var(--accent); }

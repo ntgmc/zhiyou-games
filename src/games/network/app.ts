@@ -38,6 +38,9 @@ function changeChapter(id: number): void {
 
 function renderMap(analysis: Analysis, editing: boolean): string {
   const current = mission();
+  const wide = current.places.length > 7;
+  const width = wide ? 1000 : 700;
+  const height = wide ? 600 : 420;
   const nodes = walk(current, save.codes) ?? [current.source];
   const available = moves(current, save.routes, save.editing === "residual");
   const next = available.filter((move) => move.from === nodes.at(-1) && !nodes.includes(move.to));
@@ -45,27 +48,30 @@ function renderMap(analysis: Analysis, editing: boolean): string {
   const lines = current.edges.map((edge) => {
     const from = current.places.find((place) => place.id === edge.from)!;
     const to = current.places.find((place) => place.id === edge.to)!;
-    const dx = (to.x - from.x) * 7;
-    const dy = (to.y - from.y) * 4.2;
+    const dx = (to.x - from.x) * width / 100;
+    const dy = (to.y - from.y) * height / 100;
     const length = Math.hypot(dx, dy);
-    const x1 = from.x * 7 + dx / length * 42;
-    const y1 = from.y * 4.2 + dy / length * 22;
-    const x2 = to.x * 7 - dx / length * 45;
-    const y2 = to.y * 4.2 - dy / length * 24;
-    const bend = current.id === 2 && edge.id === "ST" ? -65
-      : current.id === 8 && edge.id === "AT" ? -65 : current.id === 8 && edge.id === "BU" ? 140 : 0;
+    const x1 = from.x * width / 100 + dx / length * 42;
+    const y1 = from.y * height / 100 + dy / length * 22;
+    const x2 = to.x * width / 100 - dx / length * 45;
+    const y2 = to.y * height / 100 - dy / length * 24;
+    const bend = edge.curve ?? (current.id === 2 && edge.id === "ST" ? -65
+      : current.id === 8 && edge.id === "AT" ? -65 : current.id === 8 && edge.id === "BU" ? 140 : 0);
     const midX = (x1 + x2) / 2;
     const midY = (y1 + y2) / 2;
+    const labelAt = wide ? dy > 0 ? .3 : dy < 0 ? .7 : .5 : .5;
+    const labelX = x1 + (x2 - x1) * labelAt;
+    const labelY = y1 + (y2 - y1) * labelAt + 2 * (1 - labelAt) * labelAt * bend;
     const label = `${current.id >= 3 ? `${analysis.flow[edge.id]}/${edge.capacity} 箱` : ""}${current.id >= 2 ? `${current.id >= 3 ? " · " : ""}${edge.cost} 点` : ""}`;
     const selected = save.codes.includes(edge.id) || save.codes.includes(`-${edge.id}`);
     const crossing = cut?.edges.includes(edge.id);
     const className = analysis.flow[edge.id] > edge.capacity ? "over" : crossing ? "crossing" : selected ? "selected" : analysis.flow[edge.id] ? "used" : "";
     const reverse = editing && save.editing === "residual" && analysis.flow[edge.id] > 0;
     return `<g class="road ${className}"><path d="M${x1} ${y1} Q${midX} ${midY + bend} ${x2} ${y2}" marker-end="url(#arrow)" />
-      ${label ? `<text x="${midX}" y="${midY + bend / 2 - 10}" text-anchor="middle">${h(label)}</text>` : ""}
+      ${label ? `<text x="${labelX}" y="${labelY - 10}" text-anchor="middle">${h(label)}</text>` : ""}
       ${reverse ? `<path class="reverse-road" d="M${x2} ${y2 + 9} Q${midX} ${midY + bend + 9} ${x1} ${y1 + 9}" marker-end="url(#back-arrow)" />` : ""}</g>`;
   }).join("");
-  return `<div class="map-scroll" tabindex="0" role="region" aria-label="路网地图，可横向滚动"><div class="network-map"><svg viewBox="0 0 700 420" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+  return `<div class="map-scroll" tabindex="0" role="region" aria-label="路网地图，可横向滚动"><div class="network-map ${wide ? "wide" : ""}"><svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true" focusable="false">
     <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker>
     <marker id="back-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
     <path class="hill" d="M0 365 L145 160 L300 355 L430 105 L700 370" />
@@ -73,7 +79,7 @@ function renderMap(analysis: Analysis, editing: boolean): string {
     ${current.places.map((place) => `<button class="map-node ${place.need ? "destination" : ""} ${nodes.includes(place.id) && editing ? "on-path" : ""} ${cut && save.side.includes(place.id) ? "source-side" : ""}"
       style="left:${place.x}%;top:${place.y}%" data-node="${place.id}" ${!editing || save.result || (place.id !== current.source && !next.some((move) => move.to === place.id)) ? "disabled" : ""}
       aria-label="${h(place.name)}${place.need ? `，需要 ${place.need} 箱` : ""}">${h(place.name)}${place.need ? `<small>需 ${place.need} 箱</small>` : ""}</button>`).join("")}</div></div>
-    <p class="mobile-map-note">左右滑动查看地图。选路线也可以用下方的通道按钮。</p>
+    <p class="mobile-map-note ${wide ? "wide-map-note" : ""}">左右滑动查看地图。选路线也可以用下方的通道按钮。</p>
     <div class="map-legend"><span><i class="legend-road"></i>箭头是运输方向</span>
     ${current.id >= 3 ? '<span>箱数：已安排 / 本班容量</span>' : ""}
     ${current.id >= 2 ? '<span>点数：每箱运费</span>' : ""}
@@ -157,7 +163,7 @@ function renderResult(): string {
     <div class="actions"><button data-command="retry">修改计划，再试一次</button>
     ${result.passed && current.id < MISSIONS.length ? '<button class="primary" data-command="next">接下一章调度单</button>' : ""}</div>
     <p class="muted">重试时保留刚才的路线和箱数，恢复发货前的库存，清除这次结果。已有成绩、解锁进度和提示记录保留。</p>
-    ${result.passed && current.id === MISSIONS.length ? "<p>你完成了目前的 8 章任务。可以回看其他章节，或调整费用较高的计划。最小费用流、道路修复和跨班运输尚未制作。</p>" : ""}
+    ${result.passed && current.id === MISSIONS.length ? "<p>四处的补给都已送齐。许衡把路线夹进交班簿：“下一班能照着核对通道了，今天的单子收好。”你已完成 24 章，可以回看其他章节，或调整本章计划比较费用。</p>" : ""}
     ${renderHints(current, save.hintLevel, hintsOpen)}</div></section>`;
 }
 
@@ -184,6 +190,7 @@ function renderPlay(): string {
     ${current.id >= 3 ? `<div><span>总仓 · 已安排</span><strong>${analysis.total} <small>/ ${current.supply} 箱</small></strong></div>` : ""}
     ${current.id >= 2 ? `<div class="${analysis.cost > current.budget ? "over-budget" : ""}"><span>计划运费</span><strong>${analysis.cost} <small>/ ${current.budget} 点</small></strong></div>` : ""}
     ${!guiding ? `<div class="goal-note"><span>通过要求</span><p>各站收齐补给${current.costGoal !== undefined ? `，运费不超过 ${current.costGoal} 点` : ""}${current.certificate ? "，送达量等于分界容量" : ""}。</p><small>完成后运费不超过 ${current.efficient} 点，可获 3 星。</small></div>` : ""}</div>
+    ${!save.result && current.id >= 15 ? `<div class="planning-status" aria-label="整班计划合计"><span>${targets(current).map(p => `<span class="station-status">${h(p.name)} ${analysis.delivered[p.id]}/${p.need} 箱</span>`).join(" · ")}<br>已安排 ${analysis.total}/${current.supply} 箱 · 运费 ${analysis.cost}/${current.costGoal ?? current.budget} 点${current.costGoal !== undefined ? "（交班目标）" : ""}</span><a href="#routes-title">核对路线 ↓</a></div>` : ""}
     <div class="workspace"><section class="panel map-panel" aria-labelledby="map-title"><div class="panel-heading"><h2 id="map-title">本班路网</h2><span>${editing ? "点击地点或使用通道按钮选路" : current.certificate ? "橙色通道跨出所选分界" : "查看本班路线"}</span></div>${renderMap(analysis, editing)}</section>
     ${editing ? renderBuilder() : guiding && step === "cut" ? `<div class="panel cut-panel"><div class="panel-body">${renderCut(analysis)}</div></div>` : ""}
     ${renderRoutes()}<section class="panel decision-panel" aria-label="${guiding ? "完成本步操作" : "确认发货"}"><div class="panel-body">
@@ -207,7 +214,7 @@ function renderManual(): string {
     ${id >= 5 ? "<p>“残量网络”显示两类选择：顺着原通道增加运输，或撤回原计划中的一段安排。撤回会减少该段已安排的箱数，也会扣除相应运费。反向箭头只表示修改计划，不让箱子倒着运。“改排路线”要选完整的总仓到接收站路径，每次增加预计送达的箱数；单纯换路线可直接删除旧路线，再新增一条。</p>" : ""}
     ${id >= 6 ? "<p>把地点分为总仓所在的一组和接收站所在的一组，两组之间的分界叫“割”。从总仓这一组跨出的原通道容量相加，得到“割容量”；反方向跨回来的通道不计入。所有运输都要跨过分界，所以送达量不可能超过这个和。容量最小的割叫“最小割”。合法方案的送达量等于某个割容量，就同时找到了最大流和最小割。本章证明的是道路容量上限，库存和预算还要分别检查。</p>" : ""}
     <p>点“执行本班运输”会一次完成整份计划，箱子全部按路线到站。游戏不计算每段路要走多久，中转站也不会留下箱子。没有车辆排队、拥堵或运输损耗。通道都是临时单向通道，容量和费用是本游戏设定的数值。</p>
-    <p>重试使用相同的地图、库存和预算，方便比较不同方案。目前有 8 章教学和独立任务；最小费用流、道路修复、跨班运输和长篇综合挑战尚未制作。</p></div></details>`;
+    <p>重试使用相同的地图、库存和预算，方便比较不同方案。第 1～6 章学习选路、容量、反向调整和割证明，第 7～12 章独立安排路线与分界，第 13～18 章重排草案、比较多站运输，第 19～24 章完成街区综合调度。可从章节菜单重看或继续任意一章。</p></div></details>`;
 }
 
 function render(): void {

@@ -9,8 +9,9 @@ const STEPS: readonly (readonly Step[])[] = [
 ];
 export interface Guide { step: number; observed: boolean; reversed: boolean }
 export const freshGuide = (): Guide => ({ step: 0, observed: false, reversed: false });
-export const guideLength = (id: number): number => STEPS[id - 1].length;
-export const guideStep = (guide: Guide, id: number): Step => STEPS[id - 1][guide.step] ?? "dispatch";
+const stepsFor = (id: number): readonly Step[] => STEPS[id - 1] ?? ["arrival"];
+export const guideLength = (id: number): number => stepsFor(id).length;
+export const guideStep = (guide: Guide, id: number): Step => stepsFor(id)[guide.step] ?? "dispatch";
 export function guideReady(guide: Guide, mission: Mission, routes: readonly Route[], side: readonly string[]): boolean {
   const analysis = analyze(mission, routes);
   switch (guideStep(guide, mission.id)) {

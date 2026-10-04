@@ -45,10 +45,10 @@ function feasiblePlans(mission) {
   return { count, minimum };
 }
 
-test("all eight references execute, and independently enumerated routes validate efficiency targets", () => {
-  assert.equal(MISSIONS.length, 8);
+test("all eight foundational references execute, and independently enumerated routes validate efficiency targets", () => {
+  assert.equal(MISSIONS.length, 24);
   const costs = [0, 3, 8, 20, 18, 15, 26, 40];
-  for (const mission of MISSIONS) {
+  for (const mission of MISSIONS.slice(0, 8)) {
     assert.equal(new Set(mission.edges.map((edge) => edge.id)).size, mission.edges.length);
     const result = execute(mission, mission.reference, mission.referenceCut ?? [mission.source]);
     assert.equal(result.passed, true, `chapter ${mission.id}`);

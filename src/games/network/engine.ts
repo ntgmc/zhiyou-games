@@ -12,6 +12,7 @@ export interface Edge {
   to: string;
   capacity: number;
   cost: number;
+  curve?: number;
 }
 export interface Route {
   nodes: string[];

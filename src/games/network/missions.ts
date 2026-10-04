@@ -1,8 +1,6 @@
-import type { Edge, Mission, Place, Route } from "./engine.js";
-
-const place = (id: string, name: string, x: number, y: number, need?: number, reply?: string): Place => ({ id, name, x, y, need, reply });
-const edge = (from: string, to: string, capacity: number, cost = 1): Edge => ({ id: `${from}${to}`, from, to, capacity, cost });
-const route = (nodes: string, amount: number): Route => ({ nodes: nodes.split(""), amount });
+import type { Mission, Place } from "./engine.js";
+import { edge, place, route } from "./roads.js";
+import { CHALLENGES } from "./challenges.js";
 const four = (need: number): Place[] => [
   place("S", "总仓", 10, 50), place("A", "北站", 40, 20), place("B", "南站", 40, 80),
   place("T", "河岸站", 88, 50, need, "周姨把收到的补给摆上货架，晚班可以继续分发了。"),
@@ -108,4 +106,5 @@ export const MISSIONS: readonly Mission[] = [
     hints: ["分别检查河岸站和山脚站。总量够了，也可能有一站还缺货。", "河岸站的两条入口容量是 2 + 4，必须用足。给山脚站选路线时，留意北站、南站和桥头站的通道还剩多少容量。", "经北站直达河岸站送 2 箱，经北站、桥头站到河岸站送 4 箱；经南站、桥头站到山脚站送 3 箱，经南站、坡道站到山脚站送 2 箱。两站分别收到 6 箱和 5 箱，共花 40 点。"],
     recap: "共用通道的箱数要合计，两个接收站的需求要分别满足。",
   },
+  ...CHALLENGES,
 ];
