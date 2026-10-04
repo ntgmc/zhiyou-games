@@ -185,8 +185,38 @@ test("publish builds contain only public files, keep subpath imports valid and a
     const song = await fetch(`${base}/zhiyou-games/${build.release}/assets/music/orbit.mp3`, { method: "HEAD" });
     assert.equal(song.status, 200);
     assert.equal(song.headers.get("content-type"), "audio/mpeg");
+    assert.equal(song.headers.get("accept-ranges"), "bytes");
     assert.match(song.headers.get("cache-control"), /immutable/);
     assert.ok(Number(song.headers.get("content-length")) > 100000);
+    const songBytes = await readFile(resolve(publishRoot, build.release, "assets/music/orbit.mp3"));
+    for (const [range, start, end] of [
+      ["bytes=0-1023", 0, 1023],
+      ["bytes=4096-", 4096, songBytes.length - 1],
+      ["bytes=-1024", songBytes.length - 1024, songBytes.length - 1],
+      [`bytes=0-${songBytes.length + 100}`, 0, songBytes.length - 1],
+      [`bytes=-${songBytes.length + 100}`, 0, songBytes.length - 1],
+    ]) {
+      const partial = await fetch(song.url, { headers: { Range: range } });
+      assert.equal(partial.status, 206, range);
+      assert.equal(partial.headers.get("content-range"), `bytes ${start}-${end}/${songBytes.length}`);
+      assert.equal(Number(partial.headers.get("content-length")), end - start + 1);
+      assert.equal(partial.headers.get("content-type"), "audio/mpeg");
+      assert.match(partial.headers.get("cache-control"), /immutable/);
+      assert.deepEqual(Buffer.from(await partial.arrayBuffer()), songBytes.subarray(start, end + 1));
+    }
+    for (const range of [`bytes=${songBytes.length}-`, "bytes=20-10", "bytes=-0", "bytes=-", "bytes=9007199254740992-"]) {
+      const invalid = await fetch(song.url, { headers: { Range: range } });
+      assert.equal(invalid.status, 416, range);
+      assert.equal(invalid.headers.get("content-range"), `bytes */${songBytes.length}`);
+      assert.equal((await invalid.arrayBuffer()).byteLength, 0);
+    }
+    const headRange = await fetch(song.url, { method: "HEAD", headers: { Range: "bytes=0-1023" } });
+    assert.equal(headRange.status, 200, "Range only applies to GET");
+    assert.equal(Number(headRange.headers.get("content-length")), songBytes.length);
+    assert.equal((await headRange.arrayBuffer()).byteLength, 0);
+    const cancelled = await fetch(song.url, { headers: { Range: "bytes=0-" } });
+    await cancelled.body.cancel();
+    assert.equal((await fetch(song.url, { method: "HEAD" })).status, 200, "cancelled streams do not stop the server");
     assert.equal((await fetch(`${base}/zhiyou-games/server.js`)).status, 404);
     assert.equal((await fetch(`${base}/zhiyou-games/_headers`)).status, 404);
     assert.equal((await fetch(`${base}/zhiyou-games/.env`)).status, 404);

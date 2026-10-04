@@ -1,5 +1,7 @@
 import { createServer } from "node:http";
+import { createReadStream } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { resolve, extname, sep } from "node:path";
 
@@ -64,20 +66,46 @@ const server = createServer(async (req, res) => {
       res.writeHead(403).end("Forbidden");
       return;
     }
-    if (!(await stat(file)).isFile()) {
+    const info = await stat(file);
+    if (!info.isFile()) {
       res.writeHead(404).end("Not found");
       return;
     }
-    const data = await readFile(file);
-    res.writeHead(200, {
+    const headers = {
       ...responseHeaders,
       "Content-Type": mime[extname(file)] || "application/octet-stream",
-      "Content-Length": data.byteLength,
+      "Content-Length": info.size,
       "Cache-Control": published && pathname.startsWith("/static/") ? "public, max-age=31536000, immutable" : "no-cache",
-    });
+    };
+    if (extname(file) === ".mp3") {
+      headers["Accept-Ranges"] = "bytes";
+      let start = 0, end = info.size - 1, status = 200;
+      if (req.method === "GET" && req.headers.range) {
+        const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+        const first = Number(range?.[1] || 0);
+        const last = range?.[2] ? Number(range[2]) : info.size - 1;
+        start = range?.[1] ? first : Math.max(0, info.size - last);
+        end = range?.[1] ? Math.min(last, info.size - 1) : info.size - 1;
+        if (!range || (!range[1] && !range[2]) || !Number.isSafeInteger(first) || !Number.isSafeInteger(last)
+            || (!range[1] && last === 0) || start >= info.size || end < start) {
+          res.writeHead(416, { ...headers, "Content-Range": `bytes */${info.size}`, "Content-Length": 0 }).end();
+          return;
+        }
+        status = 206;
+        headers["Content-Range"] = `bytes ${start}-${end}/${info.size}`;
+        headers["Content-Length"] = end - start + 1;
+      }
+      res.writeHead(status, headers);
+      if (req.method === "HEAD") res.end();
+      else await pipeline(createReadStream(file, status === 206 ? { start, end } : undefined), res);
+      return;
+    }
+    const data = await readFile(file);
+    res.writeHead(200, { ...headers, "Content-Length": data.byteLength });
     res.end(req.method === "HEAD" ? undefined : data);
   } catch (error) {
-    res.writeHead(error instanceof URIError ? 400 : 404).end("Not found");
+    if (res.headersSent) res.destroy();
+    else res.writeHead(error instanceof URIError ? 400 : 404).end("Not found");
   }
 });
 server.listen(port, "127.0.0.1", () => {
