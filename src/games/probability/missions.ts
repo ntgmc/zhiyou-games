@@ -1,21 +1,7 @@
-import type { Batch, Detector, Device, Mission, Plan } from "./engine.js";
-export const SCREEN: Detector = { id: "screen", name: "快速筛查", sensitivity: 0.9, falseAlarm: 0.05, cost: 1, work: 1 };
-export const PRECISE: Detector = { id: "precise", name: "台架复检", sensitivity: 0.95, falseAlarm: 0.01, cost: 3, work: 2 };
-const cheap: Detector = { id: "cheap", name: "便携检测", sensitivity: 0.7, falseAlarm: 0.15, cost: 1, work: 1 };
-const report = { source: "测量 A-17", title: "初筛原件", detector: SCREEN, red: true };
-const device: Device = {
-  kind: "device", id: "lamp", title: "学校的投影灯", requester: "许老师",
-  request: "下午上课要用这盏灯。请决定要不要检测，以及什么情况下更换。",
-  prior: 0.02, evidence: [report], detectors: [PRECISE], replaceCost: 12, faultLoss: 60,
-};
-const batch: Batch = {
-  kind: "batch", id: "switches", title: "工坊的一批开关", requester: "周师傅",
-  request: "明天要把这批开关装进 10 台设备。先选检查几件样品，再决定查出多少坏件时更换整批。",
-  rates: [0.02, 0.1, 0.3], weights: [0.5, 0.3, 0.2], count: 10, sampleCost: 1, maxSamples: 4, replaceCost: 6, faultLoss: 60,
-};
-const direct = (action: "keep" | "replace"): Plan => ({ detectorId: "", red: action, green: action, samples: 0, cutoff: 1 });
-const test = (id: string): Plan => ({ ...direct("replace"), detectorId: id, green: "keep" });
-const sample = (n: number, cutoff: number): Plan => ({ ...direct("keep"), samples: n, cutoff });
+import type { Mission } from "./engine.js";
+import { batch, cheap, device, direct, PRECISE, report, sample, SCREEN, test } from "./jobs.js";
+export { PRECISE, SCREEN } from "./jobs.js";
+import { CHALLENGES } from "./challenges.js";
 
 export const MISSIONS: readonly Mission[] = [
   {
@@ -80,4 +66,5 @@ export const MISSIONS: readonly Mission[] = [
     hints: ["分别比较每份单直接处理和先调查的平均损失，看看哪份更值得花检测费。", "三份单合用 7 点调查预算、6 格工时。不检测就直接更换或保留，都不占调查工时。", "投影灯用台架复检，标红就换、未标红就留；收音机不检测，直接保留；按钮检查 4 件样品，至少 1 件坏就全换。总平均损失约为 55.58 点。"],
     reference: [test("precise"), direct("keep"), sample(4, 1)], recap: "检测费和工时有限。先比较每份单调查后能减少多少平均损失，再决定查哪几份。",
   },
+  ...CHALLENGES,
 ];

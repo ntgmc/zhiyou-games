@@ -39,6 +39,6 @@ export function renderResult(current: Mission, plans: readonly Plan[], result: R
     </tbody></table></div><p>设备实际坏了几件，在执行后才揭晓。重试保留这些设备和检测结果，方便比较不同方案；刷新也不会重新抽取。</p></details>
     <div class="actions"><button data-command="retry">调整本章方案</button>
     ${result.passed && !last ? '<button class="primary" data-command="next">接下一章检修单</button>' : ""}</div>
-    ${result.passed && last ? '<p class="edition-note">你已完成首版的 8 章。抽样偏差、对照实验和长篇综合挑战尚未制作。</p>' : ""}
+    ${result.passed && last ? '<p class="edition-note">罗师傅收好十二份检修单：“设备的去向和这班账都记录好了，交班吧。”你已完成 24 章，可以从章节菜单回看任务，或调整本章方案比较结果。</p>' : ""}
     <p class="muted reset-note">调整方案会清除这次账单，保留你的设置、成绩和解锁进度。本次使用过提示的记录也会保留。</p></section>`;
 }

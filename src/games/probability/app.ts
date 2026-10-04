@@ -61,7 +61,7 @@ function renderCase(job: Case, index: number): string {
       ${Array.from({ length: plan.samples + 2 }, (_, n) => `<option value="${n}" ${plan.cutoff === n ? "selected" : ""}>${n === 0 ? "总是更换" : n > plan.samples ? "总是保留" : `至少查出 ${n} 件坏样品`}</option>`).join("")}</select></label></div>
       <p>先填好更换条件，执行后根据查出的坏件数，自动更换或保留全部 ${job.count} 件待用设备。</p>`;
   }
-  return `<article class="card job"><div class="job-heading"><span class="job-number">${String(index + 1).padStart(2, "0")}</span><div><p class="eyebrow">${h(job.requester)}的检修单</p>
+  return `<article class="card job" id="job-${index}"><div class="job-heading"><span class="job-number">${String(index + 1).padStart(2, "0")}</span><div><p class="eyebrow">${h(job.requester)}的检修单</p>
     <h2>${h(job.title)}</h2></div><span class="job-kind">${job.kind === "batch" ? "批次取样" : "单台检修"}</span></div><p class="request">${h(job.request)}</p>
     <div class="job-body"><section class="job-facts" aria-label="${h(job.title)}的资料"><h3>已有资料</h3>${facts}
     <dl class="cost-facts"><div><dt>更换 1 件</dt><dd>${job.replaceCost} 点</dd></div><div><dt>留下 1 件坏设备</dt><dd>损失 ${job.faultLoss} 点</dd></div></dl>
@@ -86,6 +86,9 @@ function renderDesk(): string {
     <p>1 格工时代表一份检查工作量，执行时不需要等待。单台设备最多追加一次检测。检测器标红表示报告异常，可能误报；未标红也可能漏掉故障。</p>
     <p>每份单都要填好方案。工具自动计算概率和平均损失，你决定怎么检查和处理。预算、工时够用就能执行；平均损失较高的方案也可以试，再看哪里需要调整。</p></details></section>
     ${!save.result && current.cases.length > 1 ? `<div class="planning-status" aria-label="整套方案当前合计"><span>调查 ${fmt(cost)} / ${current.budget} 点 · ${work} / ${current.work} 格<br>平均损失 ${fmt(expected)} / ${current.goal} 点</span><a href="#dispatch">核对整套方案 ↓</a></div>` : ""}
+    ${current.cases.length > 3 ? `<details data-panel="overview"><summary>对照整班的调查安排</summary><div class="table-wrap" tabindex="0" role="region" aria-label="整班调查安排，可横向滚动"><table><caption>点击检修单名称，回到对应资料与方案</caption><thead><tr><th>检修单</th><th>当前调查</th><th>调查费</th><th>工时</th><th>平均损失</th></tr></thead><tbody>
+    ${current.cases.map((job, i) => `<tr><th><a href="#job-${i}">${h(job.title)}</a></th><td>${job.kind === "device" ? h(job.detectors.find(item => item.id === save.plans[i].detectorId)?.name ?? "不追加检测") : `${save.plans[i].samples} 件样品`}</td><td>${fmt(analyses[i].cost)} 点</td><td>${analyses[i].work} 格</td><td>${fmt(analyses[i].expected)} 点</td></tr>`).join("")}
+    </tbody></table></div></details>` : ""}
     <div class="job-grid">${current.cases.map(renderCase).join("")}</div>
     <section class="card dispatch" id="dispatch" tabindex="-1" aria-label="执行整套方案"><div class="metrics"><p>调查费 <strong>${fmt(cost)} / ${current.budget} 点</strong></p>
     <p>调查工时 <strong>${work} / ${current.work} 格</strong></p><p>全部检修单的平均损失 <strong>${fmt(expected)} 点</strong></p></div>
@@ -118,7 +121,7 @@ function renderManual(): string {
     <h2>模型作了哪些简化？</h2>
     <p>样品是同一生产状态下额外制备的，不减少待用件数，检查能准确判断好坏。固定生产状态后，各件设备的好坏互不影响。单台设备实际好坏固定后，各次检测独立工作，同一次检测的报告只用一次。这些都是“条件独立”的假设，现实中未必成立。</p>
     <p>更换能消除本次故障，模型没有加入后续老化或维修失败。同一章的实际设备状态和检测结果固定，重试、刷新或改变操作顺序都不会重新抽取。</p>
-    <p>首版有 8 章基础教学与独立值班。抽样偏差、可信区间、对照实验和长篇综合挑战尚未制作。</p></div></details>`;
+    <p>第 1～7 章学习检测和取样，第 8～12 章独立比较报告与处理门槛，第 13～18 章安排共享调查资源，第 19～24 章完成街区综合值班。可从章节菜单重看或继续任意一章。</p></div></details>`;
 }
 function render(): void {
   const restore = rememberView(root!);

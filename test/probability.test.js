@@ -89,11 +89,11 @@ test("batch posterior and binomial mixture agree across all sample outcomes", ()
   assert.deepEqual(sampleObservations(batch, 99, 2), sampleObservations(batch, 99, 4).slice(0, 2));
 });
 
-test("every reference executes at three stars; exhaustive legal policies validate targets", () => {
-  assert.equal(MISSIONS.length, 8);
+test("all eight foundational references execute at three stars; exhaustive legal policies validate targets", () => {
+  assert.equal(MISSIONS.length, 24);
   const expected = [2.92, 12, 6.956417910447762, 12, 8.832, 6.956417910447762, 47.62556416, 55.58198207044776];
   const winningCounts = [];
-  for (const mission of MISSIONS) {
+  for (const mission of MISSIONS.slice(0, 8)) {
     const result = execute(mission, mission.reference);
     close(result.expected, expected[mission.id - 1]);
     assert.equal(result.stars, 3, `chapter ${mission.id}`);
@@ -226,7 +226,7 @@ test("settlement explains average scoring and itemizes the actual costs without 
   for (const mission of MISSIONS) {
     for (const plans of [mission.reference, mission.cases.map(defaultPlan)]) {
       const result = execute(mission, plans);
-      const html = renderResult(mission, plans, result, false, mission.id === 8);
+      const html = renderResult(mission, plans, result, false, mission.id === MISSIONS.length);
       let replacement = 0;
       let faults = 0;
       result.outcomes.forEach((outcome, i) => {

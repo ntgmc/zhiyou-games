@@ -1,7 +1,7 @@
 import { escapeHtml as h } from "../../shared/html.js";
 import { analyze, deviceProbability, randomUnit, sampleObservations, samplePosterior, update } from "./engine.js";
 import type { Batch, Device, Mission } from "./engine.js";
-import { PRECISE, SCREEN } from "./missions.js";
+import { PRECISE, SCREEN } from "./jobs.js";
 
 export const fmt = (value: number): string => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(value);
 export const pct = (value: number): string => `${fmt(value * 100)}%`;
@@ -24,8 +24,9 @@ export interface Guide {
 export const freshGuide = (): Guide => ({
   step: 0, filtered: false, runs: 0, redSeen: false, greenSeen: false, outcome: null, tried: false, traced: false, samples: 0,
 });
-export const guideLength = (id: number): number => STEPS[id - 1].length;
-export const guideStep = (guide: Guide, id: number): Step | "dispatch" => STEPS[id - 1][guide.step] ?? "dispatch";
+const stepsFor = (id: number): readonly Step[] => STEPS[id - 1] ?? ["arrival"];
+export const guideLength = (id: number): number => stepsFor(id).length;
+export const guideStep = (guide: Guide, id: number): Step | "dispatch" => stepsFor(id)[guide.step] ?? "dispatch";
 export function guideReady(guide: Guide, id: number): boolean {
   switch (guideStep(guide, id)) {
     case "arrival": return true;
@@ -111,7 +112,7 @@ export function renderGuide(guide: Guide, mission: Mission): string {
   let task = "";
   if (step === "arrival") {
     text = mission.opening;
-    task = `<p>${mission.id === 8 ? "罗师傅：三份单都要处理，共用一份检测预算和工时。各份单怎么查、怎么处理，由你来定。"
+    task = `<p>${mission.id >= 8 ? `罗师傅：${mission.cases.length} 份单都要处理，共用 ${mission.budget} 点调查预算和 ${mission.work} 格工时。资料、费用和完整处理条件都在检修桌，怎么查、怎么处理，由你来定。`
       : "罗师傅：先用练习台试一试，再安排这张单。练习不花正式预算，练习结果也和正式检测分开。"}</p>`;
   } else if (step === "population" || step === "filter") {
     const prior = (job as Device).prior;
@@ -169,12 +170,12 @@ export function renderGuide(guide: Guide, mission: Mission): string {
     <div class="repair-illustration" aria-hidden="true"><span class="lamp-shade"></span><span class="lamp-stem"></span><span class="lamp-base"></span></div>
     <p class="eyebrow">第 ${String(mission.id).padStart(2, "0")} 章 · ${mission.cases.length} 份检修单</p><h2>${h(job.title)}</h2>
     <p>${h(job.requester)}：${h(job.request)}</p>${mission.cases.length > 1 ? `<ul>${mission.cases.slice(1).map((item) => `<li>${h(item.title)}</li>`).join("")}</ul>` : ""}
-    <span class="file-stamp">${mission.id === 8 ? "独立值班" : "待检修"}</span></aside>
+    <span class="file-stamp">${mission.id >= 8 ? "独立值班" : "待检修"}</span></aside>
     <section class="card dialogue" aria-labelledby="guide-title"><div class="guide-heading"><p class="eyebrow">第 ${mission.id} 章 · ${h(mission.concept)}</p>
     <span class="step-count">${guide.step + 1} / ${guideLength(mission.id)}</span></div>
-    <div class="guide-progress" aria-label="引导 ${guide.step + 1}/${guideLength(mission.id)}">${STEPS[mission.id - 1].map((_, i) => `<span class="${i <= guide.step ? "seen" : ""}" aria-hidden="true"></span>`).join("")}</div>
+    <div class="guide-progress" aria-label="引导 ${guide.step + 1}/${guideLength(mission.id)}">${stepsFor(mission.id).map((_, i) => `<span class="${i <= guide.step ? "seen" : ""}" aria-hidden="true"></span>`).join("")}</div>
     <h1 id="guide-title" tabindex="-1">${h(mission.title)}</h1><div class="speaker"><span aria-hidden="true">${step === "arrival" ? "记" : "罗"}</span><div>${step === "arrival" ? "报修记录" : "罗师傅"}<small>${step === "arrival" ? "检修单送到了" : "带你试一次"}</small></div></div>
     <p class="dialogue-copy">${h(text)}</p><div class="practice"><p class="practice-label">${step === "arrival" ? "接单说明" : "练习台"}</p>${task}</div>
-    <div class="guide-actions"><button class="primary" data-command="advance" ${guideReady(guide, mission.id) ? "" : "disabled"}>${step === "arrival" ? mission.id === 8 ? "开始独立值班" : "接下检修单" : last ? "去安排检修方案" : "继续"}</button>
+    <div class="guide-actions"><button class="primary" data-command="advance" ${guideReady(guide, mission.id) ? "" : "disabled"}>${step === "arrival" ? mission.id >= 8 ? "开始独立值班" : "接下检修单" : last ? "去安排检修方案" : "继续"}</button>
     ${guideReady(guide, mission.id) ? "" : '<p class="muted">完成这一步练习后，就可以继续。</p>'}</div></section></div>`;
 }

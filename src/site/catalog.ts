@@ -47,7 +47,7 @@ export const GAMES: readonly GameEntry[] = [
     saveKey: "repair-station-save-v1",
     testKey: "repair-station-test-v1",
     tags: ["条件概率", "贝叶斯更新", "期望损失", "批次推断"],
-    chapters: 8,
+    chapters: 24,
     chapterLabel: "章",
     href: "./games/probability/",
   },
