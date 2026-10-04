@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { GameAudio, normalizeAudioSettings, sceneTrack } from "../.build/src/games/information/audio.js";
+import { GameAudio as SharedAudio } from "../.build/src/shared/audio.js";
+import { GAME_MUSIC } from "../.build/src/shared/music.js";
 
 function deferred() {
   let resolve, reject;
@@ -10,7 +12,7 @@ function deferred() {
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-function harness({ saved, blockedStorage = false } = {}) {
+function harness({ saved, blockedStorage = false, track } = {}) {
   const requests = [];
   const sources = [];
   const values = new Map(saved ? [["audio", JSON.stringify(saved)]] : []);
@@ -35,7 +37,9 @@ function harness({ saved, blockedStorage = false } = {}) {
     async decodeAudioData(value) { return { value }; },
   };
   const errors = [];
-  const audio = new GameAudio({
+  const Player = track ? SharedAudio : GameAudio;
+  const audio = new Player({
+    ...(track ? { tracks: [track] } : {}),
     storageKey: "audio",
     storage: {
       getItem(key) { if (blockedStorage) throw new Error("Storage disabled"); return values.get(key) || null; },
@@ -44,7 +48,7 @@ function harness({ saved, blockedStorage = false } = {}) {
     contextFactory: () => context,
     fetcher(url) {
       const pending = deferred();
-      requests.push({ id: url.pathname.split("/").at(-1), ...pending });
+      requests.push({ id: url.pathname.split("/").at(-1), url, ...pending });
       return pending.promise;
     },
     onError: (message) => errors.push(message),
@@ -54,6 +58,36 @@ function harness({ saved, blockedStorage = false } = {}) {
     await settle();
   };
   return { audio, requests, sources, context, errors, values, deliver };
+}
+
+for (const [game, track] of Object.entries(GAME_MUSIC)) {
+  test(`${game} loads its own theme on demand and keeps the loop across chapters and results`, async () => {
+    const h = harness({ track, saved: { enabled: true, volume: 0.18, track: "storm" } });
+    assert.equal(h.audio.settings.track, "auto", "another game's fixed track cannot leak into this game");
+    assert.equal(h.audio.state.trackId, track.id);
+    h.audio.setScene({ missionId: 1, intro: true });
+    assert.equal(h.requests.length, 0);
+    await h.audio.unlock();
+    assert.equal(h.requests[0].id, track.file);
+    assert.ok(h.requests[0].url.pathname.endsWith(`/assets/music/${track.file}`));
+    await h.deliver(h.requests[0]);
+    const voice = h.audio.current;
+    assert.equal(voice.source.loop, true);
+    assert.equal(h.audio.master.gain.value, 0.18);
+    for (const scene of [{ missionId: 24 }, { status: "lost" }, { status: "won" }, { intro: true }]) h.audio.setScene(scene);
+    await settle();
+    assert.equal(h.audio.current, voice);
+    assert.equal(h.requests.length, 1);
+    await h.audio.setHidden(true);
+    assert.equal(h.audio.state.playing, false);
+    await h.audio.setHidden(false);
+    assert.equal(h.audio.current, voice);
+    await h.audio.setEnabled(false);
+    assert.equal(voice.source.stopped, true);
+    const saved = JSON.parse(h.values.get("audio"));
+    assert.equal(saved.enabled, false);
+    assert.equal(saved.volume, 0.18);
+  });
 }
 
 test("scene selection follows chapter phases and ignores temporary tools and transmissions", () => {

@@ -1,0 +1,19 @@
+.background-music { position: relative; font-size: .82rem; flex-shrink: 0; }
+.background-music > summary { display: flex; align-items: center; gap: .5rem; min-height: 44px; margin: 0; padding: .5rem .75rem; color: inherit; cursor: pointer; list-style: none; border: 1px solid currentColor; border-radius: 6px; white-space: nowrap; }
+.background-music[open] > summary { margin-bottom: 0; }
+.background-music > summary::-webkit-details-marker { display: none; }
+.background-music > summary::before { content: "♫"; }
+.background-music-panel { position: absolute; right: 0; top: calc(100% + .5rem); z-index: 20; width: 270px; max-width: calc(100vw - 2rem); padding: 1rem; display: grid; gap: .65rem; color: var(--ink, var(--color-ink)); background: var(--paper, var(--color-surface)); border: 1px solid var(--line, var(--color-rule)); border-radius: 8px; box-shadow: 0 8px 24px #182b2020; }
+.background-music-panel > strong { font-size: .95rem; }
+.background-music .background-music-panel > button { background: var(--paper, var(--color-surface)); color: var(--ink, var(--color-ink)); border-color: var(--line, var(--color-control)); }
+.background-music .background-music-panel > button:hover { background: var(--paper, var(--color-paper-2)); color: var(--ink, var(--color-ink)); }
+.background-music-volume { display: flex; align-items: center; gap: .75rem; }
+.background-music-volume input { flex: 1; min-width: 0; width: 100%; min-height: 44px; padding: 0; accent-color: var(--accent, var(--color-accent)); }
+.background-music-volume output { min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
+.background-music-panel > p { margin: 0; color: var(--muted, var(--color-muted)); font-size: .78rem; }
+@media (max-width: 680px) {
+  .site-header nav { width: 100%; }
+  .site-header nav > button { white-space: nowrap; }
+  .site-header nav .background-music { flex-basis: 100%; }
+  .background-music-panel { position: static; width: 100%; margin-top: .5rem; }
+}

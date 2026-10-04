@@ -2,6 +2,7 @@ import { escapeHtml as h } from "../../shared/html.js";
 import { rememberView } from "../../shared/view-state.js";
 import { archiveChapter, resumeChapter } from "../../shared/chapter-drafts.js";
 import { backupControls, installBackup } from "../../shared/save-backup.js";
+import { GAME_MUSIC, installMusic } from "../../shared/music.js";
 import { adjust, analyze, cutFor, execute, moves, placeName, routeError, targets, walk } from "./engine.js";
 import type { Analysis, Mission } from "./engine.js";
 import { MISSIONS } from "./missions.js";
@@ -13,6 +14,7 @@ const notice = document.querySelector<HTMLElement>("#notice");
 if (!root || !notice) throw new Error("缺少补给网页面入口。");
 const testMode = new URLSearchParams(location.search).has("test");
 const key = testMode ? "mountain-network-test-v1" : SAVE_KEY;
+const music = installMusic(root, key, GAME_MUSIC.network);
 const save = readSave(key);
 let menu = false;
 let storageFailed = false;
@@ -224,7 +226,7 @@ function render(): void {
   const opened = new Set(sameMission ? [...root!.querySelectorAll<HTMLDetailsElement>("details[id][open]")].map((details) => details.id) : []);
   root!.innerHTML = `<header class="site-header"><a class="brand" href="../../${testMode ? "?test=1" : ""}" aria-label="返回知游游戏目录"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M6 22 16 8l10 14M6 22h20M16 8v14" /><circle cx="6" cy="22" r="3" /><circle cx="16" cy="8" r="3" /><circle cx="26" cy="22" r="3" /></svg></span><span>山城补给网<small>知游 · 图论与网络优化</small></span></a>
     <nav aria-label="补给网菜单"><button data-command="menu" aria-expanded="${menu}">章节与成绩</button>
-    <button data-command="mode">${save.mode === "story" ? "自由调度" : "回到剧情引导"}</button></nav></header>
+    <button data-command="mode">${save.mode === "story" ? "自由调度" : "回到剧情引导"}</button>${music.render()}</nav></header>
     <main id="desk" tabindex="-1"><div class="chapter-line"><span>山城运输站 <span aria-hidden="true">/</span> 第 ${String(current.id).padStart(2, "0")} 章</span><span>已通过 ${Object.keys(save.best).length} / ${MISSIONS.length} 章</span></div>
     ${menu ? `<section class="panel chapter-menu"><div class="panel-body"><div class="menu-heading"><h2 id="chapters-title">章节与成绩</h2><button class="text-button" data-command="menu">收起章节</button></div>
     <p class="muted">切换章节会保留各章的路线、分界选择和引导步骤。重看剧情只清除本章当前尝试，已有成绩和解锁进度保留。每章都可以提前体验，第一次玩建议从第一章开始。</p>

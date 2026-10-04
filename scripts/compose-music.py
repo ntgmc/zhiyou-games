@@ -1,4 +1,4 @@
-"""Render the game's four original, circular ambient compositions.
+"""Render the games' original, circular background compositions.
 
 Development-only requirements: Python, numpy, and ffmpeg (or imageio-ffmpeg).
 The committed MP3 files are sufficient to build and play the game.
@@ -8,6 +8,7 @@ from pathlib import Path
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import wave
 
@@ -66,6 +67,45 @@ SCORES = [
     },
 ]
 
+THEMES = [
+    {
+        "id": "harbor", "title": "港口午后", "bpm": 78,
+        "chords": [[48, 55, 59, 62, 64], [45, 52, 55, 59, 62],
+                   [50, 57, 60, 64, 65], [43, 53, 57, 59, 64],
+                   [48, 55, 59, 62, 64], [52, 59, 62, 65, 67],
+                   [45, 52, 55, 59, 60], [43, 53, 57, 59, 62]],
+        "phrases": [[76, 79, 74, 72], [71, 72, 76, 74],
+                    [77, 76, 72, 69], [71, 74, 76, 74],
+                    [79, 81, 79, 76], [77, 76, 74, 71],
+                    [72, 76, 74, 71], [69, 71, 74, 72]],
+        "voice": "piano",
+    },
+    {
+        "id": "workbench", "title": "台灯下", "bpm": 70,
+        "chords": [[50, 57, 61, 64, 66], [47, 54, 57, 61, 64],
+                   [43, 50, 54, 57, 61], [45, 52, 57, 59, 64],
+                   [50, 57, 61, 64, 66], [54, 61, 64, 68, 69],
+                   [47, 54, 57, 61, 66], [45, 52, 57, 61, 64]],
+        "phrases": [[73, 76, 78, 76], [73, 69, 73, 71],
+                    [69, 73, 74, 73], [71, 69, 68, 69],
+                    [78, 81, 78, 76], [76, 73, 69, 68],
+                    [73, 76, 78, 73], [71, 73, 69, 73]],
+        "voice": "electric",
+    },
+    {
+        "id": "mountain", "title": "沿山而行", "bpm": 84,
+        "chords": [[43, 50, 55, 59, 62], [50, 57, 62, 66, 69],
+                   [52, 59, 64, 67, 71], [48, 55, 60, 64, 67],
+                   [43, 50, 55, 59, 62], [45, 52, 57, 60, 64],
+                   [48, 55, 60, 64, 67], [50, 57, 62, 66, 69]],
+        "phrases": [[74, 71, 69, 67], [69, 74, 76, 74],
+                    [76, 79, 78, 76], [72, 76, 74, 71],
+                    [71, 74, 79, 76], [72, 71, 69, 67],
+                    [67, 72, 76, 74], [69, 71, 74, 69]],
+        "voice": "pluck",
+    },
+]
+
 
 def frequency(midi):
     return 440 * 2 ** ((midi - 69) / 12)
@@ -92,6 +132,23 @@ def add_voice(mix, start, duration, midi, amplitude, pan, voice, color=0.25):
         signal = (np.sin(2 * PI * freq * time)
                   + 0.18 * np.sin(2 * PI * freq * 2 * time) * np.exp(-time * 3)
                   + 0.05 * np.sin(2 * PI * freq * 3 * time)) / 1.23
+    elif voice in ("piano", "electric", "pluck"):
+        attack = 90 if voice == "pluck" else 42
+        decay = 1.5 if voice == "pluck" else 0.9
+        envelope = (1 - np.exp(-time * attack)) * np.exp(-time * decay)
+        envelope *= np.clip((duration - time) / 0.18, 0, 1)
+        phase = 2 * PI * freq * time
+        if voice == "electric":
+            signal = (np.sin(phase + 0.8 * np.exp(-time * 3) * np.sin(phase * 2))
+                      + 0.15 * np.sin(phase * 2) * np.exp(-time * 1.8)) / 1.15
+        else:
+            signal = sum(np.sin(phase * partial) * level * np.exp(-time * partial * 0.32)
+                         for partial, level in [(1, 1), (2, 0.4), (3, 0.2), (4, 0.07)]) / 1.67
+    elif voice == "flute":
+        envelope = np.minimum(time / 0.15, 1) * np.clip((duration - time) / 0.5, 0, 1)
+        envelope *= 0.8 + 0.2 * np.sin(PI * time / duration)
+        phase = 2 * PI * freq * time + 0.02 * np.sin(2 * PI * 4.7 * time)
+        signal = (np.sin(phase) + 0.12 * np.sin(phase * 2)) / 1.12
     else:
         envelope = (1 - np.exp(-time * 12)) * np.exp(-time * 2.4)
         envelope *= np.minimum((duration - time) / 0.2, 1)
@@ -135,6 +192,68 @@ def render(score):
     return mix, duration
 
 
+def render_theme(score):
+    """Two passes of eight phrases, with a quieter second-pass accompaniment."""
+    beat = 60 / score["bpm"]
+    duration = beat * 192
+    mix = np.zeros((round(duration * RATE), 2), dtype=np.float32)
+    rng = np.random.default_rng(20261004)
+    for section in range(16):
+        chord = score["chords"][section % 8]
+        start = section * 12 * beat
+        second = section >= 8
+        accompaniment = 0.82 if second else 1
+        if score["id"] == "harbor":
+            # A little swing and sparse chord answers suggest a quiet dockside trio.
+            for pulse in (0, 4.5, 8):
+                for i, note in enumerate(chord[1:]):
+                    add_voice(mix, start + (pulse + i * 0.035) * beat, 3.6,
+                              note + (12 if second and pulse == 4.5 else 0),
+                              0.042 * accompaniment, (i - 1.5) * 0.2, "piano")
+            for pulse in range(0, 12, 2):
+                note = chord[0] - 12 if pulse % 4 == 0 else chord[1] - 12
+                add_voice(mix, start + pulse * beat, 1.7, note, 0.11 * accompaniment, -0.12, "pulse")
+            positions = [1, 3 + 2 / 3, 6, 9 + 2 / 3]
+        elif score["id"] == "workbench":
+            for pulse in (0, 6):
+                for i, note in enumerate(chord):
+                    add_voice(mix, start + (pulse + i * 0.06) * beat, 5.5,
+                              note, 0.044 * accompaniment, (i - 2) * 0.17, "electric")
+            for pulse in range(0, 12, 3):
+                add_voice(mix, start + pulse * beat, 2, chord[0] - 12, 0.065 * accompaniment, 0, "pulse")
+            positions = [1, 4, 7, 10]
+        else:
+            for pulse in range(12):
+                slot = [0, 1, 2, 3, 2, 1][pulse % 6]
+                add_voice(mix, start + pulse * beat, 2.2, chord[slot],
+                          (0.08 if slot == 0 else 0.05) * accompaniment, np.sin(pulse) * 0.25, "pluck")
+            positions = [0.5, 3, 6.5, 9]
+        for j, position in enumerate(positions):
+            note = score["phrases"][section % 8][j]
+            if second and j == 3:
+                continue
+            add_voice(mix, start + position * beat, 2.4 if score["id"] == "mountain" else 3.2,
+                      note, 0.06 if second else 0.075, -0.15 if j % 2 else 0.15,
+                      "flute" if score["id"] == "mountain" else score["voice"])
+        # Quiet, deterministic brushed ticks; no recorded percussion samples.
+        if score["id"] == "harbor":
+            for pulse in range(1, 12, 2):
+                length = round(RATE * 0.14)
+                time = np.arange(length) / RATE
+                noise = rng.normal(0, 1, length)
+                brushed = np.convolve(noise, np.ones(10) / 10, mode="same")
+                signal = brushed * (1 - np.exp(-time * 70)) * np.exp(-time * 35) * 0.014
+                indices = (np.arange(length) + round((start + pulse * beat) * RATE)) % len(mix)
+                mix[indices] += signal[:, None]
+    dry = mix.copy()
+    for delay, level in [(beat * 0.75, 0.10), (beat * 1.5, 0.065), (beat * 2.25, 0.035)]:
+        mix += np.roll(dry[:, ::-1], round(delay * RATE), axis=0) * level
+    mix -= np.mean(mix, axis=0)
+    rms = float(np.sqrt(np.mean(mix ** 2)))
+    mix *= min(0.62 / max(float(np.max(np.abs(mix))), 0.01), 0.1 / max(rms, 0.01))
+    return mix, duration
+
+
 def encoder():
     executable = os.environ.get("FFMPEG") or shutil.which("ffmpeg")
     if executable:
@@ -150,8 +269,15 @@ def main():
     ffmpeg = encoder()
     OUTPUT.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="deep-space-score-") as temporary:
-        for score in SCORES:
-            mix, duration = render(score)
+        scores = SCORES + THEMES
+        if sys.argv[1:]:
+            requested = set(sys.argv[1:])
+            unknown = requested - {score["id"] for score in scores}
+            if unknown:
+                raise SystemExit(f"Unknown tracks: {', '.join(sorted(unknown))}")
+            scores = [score for score in scores if score["id"] in requested]
+        for score in scores:
+            mix, duration = render_theme(score) if score in THEMES else render(score)
             wav_path = Path(temporary) / f"{score['id']}.wav"
             with wave.open(str(wav_path), "wb") as audio:
                 audio.setnchannels(2)
@@ -163,7 +289,7 @@ def main():
                 ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav_path),
                 "-codec:a", "libmp3lame", "-b:a", "112k",
                 "-metadata", f"title={score['title']}",
-                "-metadata", "artist=Deep Space Comms Original Score",
+                "-metadata", "artist=Zhiyou Original Score",
                 "-metadata", "comment=Original synthesized composition; no sampled recordings.",
                 str(target),
             ], check=True)

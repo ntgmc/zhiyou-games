@@ -2,6 +2,7 @@ import { escapeHtml as h } from "../../shared/html.js";
 import { rememberView } from "../../shared/view-state.js";
 import { archiveChapter, resumeChapter } from "../../shared/chapter-drafts.js";
 import { backupControls, installBackup } from "../../shared/save-backup.js";
+import { GAME_MUSIC, installMusic } from "../../shared/music.js";
 import { ACTIONS, actionName, analyze, contractMatrix, cooperationCount, createSession, defaultPlan, planError, settle, stars, validPlan } from "./engine.js";
 import type { Analysis, Matrix, Plan, Round } from "./engine.js";
 import { MANUAL, MISSIONS } from "./missions.js";
@@ -14,6 +15,7 @@ const dialog = document.querySelector<HTMLDialogElement>("#workshop")!;
 const notice = document.querySelector<HTMLElement>("#notice")!;
 const testing = new URLSearchParams(location.search).has("test");
 const key = testing ? "tidal-harbor-test-v1" : SAVE_KEY;
+const music = installMusic(app, key, GAME_MUSIC["game-theory"]);
 const desktop = matchMedia("(min-width: 64rem)");
 let save = readSave(key);
 let error = "";
@@ -162,7 +164,7 @@ function render(): void {
   const repeated = round.continuation !== undefined;
   const learning = guiding();
   app.innerHTML = `${navigation()}<div class="main-shell">
-    <header class="topbar"><span>白帆运输 · ${learning ? "港口值班" : mission.concept}</span><button type="button" class="quiet" data-command="mode">${save.mode === "story" ? "打开完整调度桌" : "返回剧情模式"}</button><span>${save.session.hinted ? "参考提示" : "独立尝试"} / 本机存档${storageFailed ? "异常" : "已保存"}</span></header>
+    <header class="topbar"><span>白帆运输 · ${learning ? "港口值班" : mission.concept}</span><button type="button" class="quiet" data-command="mode">${save.mode === "story" ? "打开完整调度桌" : "返回剧情模式"}</button><span>${save.session.hinted ? "参考提示" : "独立尝试"} / 本机存档${storageFailed ? "异常" : "已保存"}</span>${music.render()}</header>
     <main id="desk"><div class="chapter-heading"><div><p class="chapter-kicker">${stage(mission.id)} · 第 ${mission.id} 章 / ${MISSIONS.length}</p><h1>${h(mission.title)}</h1></div><button type="button" class="quiet" data-command="${save.mode === "story" ? "replay" : "restart"}">${save.mode === "story" ? "重看本章剧情" : "重开本章"}</button></div>
       <p class="helper">重看剧情或重开本章会清空本次排班、草稿和练习，从第一班开始；已有星级与独立成绩保留。切换模式保留当前进度。</p>
       ${learning ? renderGuide(save.guide, mission, session, error) : `<p class="introduction">${h(mission.introduction)}</p>

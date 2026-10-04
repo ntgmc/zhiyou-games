@@ -63,6 +63,8 @@ async function verify() {
     [gameAppUrl, /(?:javascript|ecmascript)/],
     [new URL(gameCss, gameUrl), /text\/css/],
     [new URL("./audio.js", gameAppUrl), /(?:javascript|ecmascript)/],
+    ...["audio.js", "music.js"].map((name) => [new URL(`../../shared/${name}`, gameAppUrl), /(?:javascript|ecmascript)/]),
+    [new URL("../../shared/music.css", gameAppUrl), /text\/css/],
     [harborAppUrl, /(?:javascript|ecmascript)/],
     [new URL(harborCss, harborUrl), /text\/css/],
     [new URL(harborTokens, harborUrl), /text\/css/],
@@ -74,7 +76,7 @@ async function verify() {
     [new URL(networkCss, networkUrl), /text\/css/],
     ...["engine", "missions", "storage", "story"].map((name) => [new URL(`./${name}.js`, networkAppUrl), /(?:javascript|ecmascript)/]),
     [new URL("../../assets/share-card.png", appUrl), /image\/png/],
-    ...["orbit", "code", "storm", "arrival"].map((id) =>
+    ...["orbit", "code", "storm", "arrival", "harbor", "workbench", "mountain"].map((id) =>
       [new URL(`../../../assets/music/${id}.mp3`, gameAppUrl), /^audio\/(?:mpeg|mp3)(?:;|$)/]),
   ];
   for (const name of ["status", "versions"]) {

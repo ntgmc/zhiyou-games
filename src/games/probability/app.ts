@@ -2,6 +2,7 @@ import { escapeHtml as h } from "../../shared/html.js";
 import { rememberView } from "../../shared/view-state.js";
 import { archiveChapter, resumeChapter } from "../../shared/chapter-drafts.js";
 import { backupControls, installBackup } from "../../shared/save-backup.js";
+import { GAME_MUSIC, installMusic } from "../../shared/music.js";
 import { actionName, analyze, execute, missionError } from "./engine.js";
 import type { Action, Case, Plan } from "./engine.js";
 import { MISSIONS } from "./missions.js";
@@ -14,6 +15,7 @@ const notice = document.querySelector<HTMLElement>("#notice");
 if (!root || !notice) throw new Error("缺少检修站页面入口。");
 const testMode = new URLSearchParams(location.search).has("test");
 const key = testMode ? "repair-station-test-v1" : SAVE_KEY;
+const music = installMusic(root, key, GAME_MUSIC.probability);
 const save = readSave(key);
 let menu = false;
 let storageFailed = false;
@@ -132,7 +134,7 @@ function render(): void {
   const openPanels = sameContext ? [...root!.querySelectorAll<HTMLDetailsElement>("details[data-panel][open]")].map((panel) => panel.dataset.panel) : [];
   renderedContext = context;
   root!.innerHTML = `<header class="site-header"><a href="../../${testMode ? "?test=1" : ""}" class="brand"><span class="brand-mark" aria-hidden="true">修</span><span>街区检修站<small>知游 · 概率与统计推断</small></span></a>
-    <nav aria-label="检修站菜单"><button data-command="menu" aria-expanded="${menu}">章节与成绩</button><button data-command="mode">${save.mode === "story" ? "进入检修桌" : "回到剧情引导"}</button></nav></header>
+    <nav aria-label="检修站菜单"><button data-command="menu" aria-expanded="${menu}">章节与成绩</button><button data-command="mode">${save.mode === "story" ? "进入检修桌" : "回到剧情引导"}</button>${music.render()}</nav></header>
     <main id="desk" tabindex="-1"><div class="chapter-strip"><span>检修记录 <strong>${String(current.id).padStart(2, "0")} / ${String(MISSIONS.length).padStart(2, "0")}</strong></span><span>${inGuide ? "剧情引导" : save.result ? "检修结算" : "检修桌"} · ${Object.keys(save.best).length} 章已通过</span></div>
     ${menu ? renderMenu() : ""}${inGuide ? renderGuide(save.guide, current) : renderDesk()}
     <div class="reference-tools">${inGuide ? "" : renderHints(current, save.hintLevel, hintsOpen)}${renderManual()}</div>

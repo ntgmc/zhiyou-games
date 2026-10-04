@@ -56,8 +56,8 @@ test("publish builds contain only public files, keep subpath imports valid and a
   }
   const css = await readFile(resolve(publishRoot, build.release, "src/games/information/game.css"), "utf8");
   assert.doesNotMatch(css, /@import|fonts\.google/);
-  const audio = await readFile(resolve(publishRoot, build.release, "src/games/information/audio.js"), "utf8");
-  assert.match(audio, /\.\.\/\.\.\/\.\.\/assets\/music\//);
+  const audio = await readFile(resolve(publishRoot, build.release, "src/shared/audio.js"), "utf8");
+  assert.match(audio, /\.\.\/\.\.\/assets\/music\//);
   const gameHtml = await readFile(resolve(publishRoot, "games/information/index.html"), "utf8");
   assert.match(gameHtml, new RegExp(`\\.\\./\\.\\./${build.release}/src/games/information/app\\.js`));
   assert.match(gameHtml, /rel="canonical" href="https:\/\/example\.com\/zhiyou-games\/games\/information\/"/);
@@ -71,7 +71,7 @@ test("publish builds contain only public files, keep subpath imports valid and a
   const networkHtml = await readFile(resolve(publishRoot, "games/network/index.html"), "utf8");
   assert.match(networkHtml, new RegExp(`\\.\\./\\.\\./${build.release}/src/games/network/app\\.js`));
   assert.match(networkHtml, /rel="canonical" href="https:\/\/example\.com\/zhiyou-games\/games\/network\/"/);
-  for (const file of ["orbit", "code", "storm", "arrival"]) {
+  for (const file of ["orbit", "code", "storm", "arrival", "harbor", "workbench", "mountain"]) {
     assert.ok((await readFile(resolve(publishRoot, build.release, `assets/music/${file}.mp3`))).length > 100000);
   }
   const repeated = await buildSite({ siteUrl: "https://example.com/zhiyou-games/", quiet: true });
@@ -132,11 +132,18 @@ test("publish builds contain only public files, keep subpath imports valid and a
     const gamePageHtml = await gamePage.text();
     const gameModuleUrl = new URL(gamePageHtml.match(/src="([^"]+app\.js)"/)[1], gameUrl);
     assert.equal((await fetch(gameModuleUrl)).status, 200);
-    const audioUrl = new URL("./audio.js", gameModuleUrl);
+    const audioUrl = new URL("../../shared/audio.js", gameModuleUrl);
     const audioSource = await (await fetch(audioUrl)).text();
     const musicPrefix = audioSource.match(/new URL\(`([^`]+)\$\{track.file\}/)[1];
     const relativeSong = new URL(`${musicPrefix}orbit.mp3`, audioUrl);
     assert.equal((await fetch(relativeSong, { method: "HEAD" })).status, 200);
+    for (const file of ["harbor", "workbench", "mountain"]) {
+      const song = await fetch(new URL(`${musicPrefix}${file}.mp3`, audioUrl), { method: "HEAD" });
+      assert.equal(song.status, 200);
+      assert.equal(song.headers.get("content-type"), "audio/mpeg");
+      assert.match(song.headers.get("cache-control"), /immutable/);
+      assert.ok(Number(song.headers.get("content-length")) > 100000);
+    }
     const gameRedirect = await fetch(`${base}/zhiyou-games/games/information?test=1`, { redirect: "manual" });
     assert.equal(gameRedirect.headers.get("location"), "/zhiyou-games/games/information/?test=1");
     const refreshed = await fetch(`${gameUrl}?test=1`);

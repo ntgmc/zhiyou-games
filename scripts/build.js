@@ -8,6 +8,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 export const publishRoot = resolve(root, "dist");
 const runtimeFiles = [
   "assets/music/orbit.mp3", "assets/music/code.mp3", "assets/music/storm.mp3", "assets/music/arrival.mp3",
+  "assets/music/harbor.mp3", "assets/music/workbench.mp3", "assets/music/mountain.mp3",
   "assets/favicon.svg", "assets/share-card.png",
 ];
 
