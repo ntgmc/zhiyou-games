@@ -178,7 +178,10 @@ export function adjust(mission: Mission, routes: readonly Route[], codes: readon
   const available = moves(mission, routes, true);
   for (const code of codes) {
     const move = available.find((item) => item.code === code);
-    if (!move || move.available < amount) throw new Error("这段通道不能增加或撤回这么多箱，请减少调整箱数。");
+    if (!move || move.available < amount) {
+      const edge = mission.edges.find((item) => item.id === code.replace(/^-/, ""))!;
+      throw new Error(`${placeName(mission, edge.from)} → ${placeName(mission, edge.to)}最多能${code.startsWith("-") ? "撤回" : "增加"} ${move?.available ?? 0} 箱，这次填了 ${amount} 箱。请减少“新增送达箱数”。`);
+    }
     analysis.flow[code.replace(/^-/, "")] += code.startsWith("-") ? -amount : amount;
   }
   // Decompose the adjusted flow back into ordinary delivery routes.

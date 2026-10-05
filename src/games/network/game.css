@@ -1,3 +1,7 @@
+/* Hallmark · component: route builder · genre: editorial · theme: existing mountain palette
+ * states: default, hover, focus, active, disabled, error, preview
+ * pre-emit critique: P4 H4 E4 S5 R4 V3
+ */
 :root {
   color-scheme: light;
   --paper: #fffefa; --ink: #223b37; --muted: #62736c; --line: #d7ddd1;
@@ -81,7 +85,7 @@ marker path { fill: #56786a; }
 .road.selected path { stroke: #184f3e; stroke-width: 5; }
 .road.crossing path { stroke: #b17032; stroke-width: 5; }
 .road.over path { stroke: #a03024; stroke-width: 5; }
-.road .reverse-road { stroke: #a16333; stroke-dasharray: 5 5; stroke-width: 2; }
+.road path.reverse-road { stroke: var(--warm); stroke-dasharray: 5 5; stroke-width: 2; }
 .map-node { position: absolute; transform: translate(-50%, -50%); width: 82px; min-height: 44px; padding: .3rem .15rem; font-size: .82rem; line-height: 1.4; background: #fffefa; box-shadow: 0 3px 0 #c3d0b7; border-color: #8da78c; }
 .map-node:disabled { opacity: 1; color: #3b5145; }
 .map-node.destination { background: #f4e7be; border-color: #c8ad6e; }
@@ -122,6 +126,22 @@ input[type="number"] { width: 80px; min-height: 44px; border: 1px solid #adbcaa;
 input[aria-invalid="true"] { border: 2px solid #932d22; }
 .path-actions { display: flex; justify-content: space-between; gap: .8rem; }
 .builder .muted { margin: .4rem 0 0; font-size: .75rem; }
+.editing-help { font-size: .84rem; margin-bottom: .5rem; }
+.residual-guide { padding: .75rem 0; margin: .75rem 0; border-block: 1px solid var(--line); font-size: .86rem; }
+.residual-builder .choices { grid-template-columns: minmax(0, 1fr); }
+.residual-builder .choices button > span { white-space: nowrap; }
+.builder button:active:not(:disabled) { border-color: var(--deep); }
+.adjustment-steps { padding-left: 1.5rem; margin: .5rem 0 1rem; font-size: .84rem; }
+.adjustment-steps li { padding: .35rem 0; }
+.adjustment-steps small { display: block; color: var(--muted); }
+.adjustment-steps .undo-leg > span { color: var(--warm); }
+.adjustment-preview { margin-top: 1rem; padding-block: 1rem; border-block: 1px solid var(--line); }
+.adjustment-preview h3 { font-size: .9rem; margin: 0 0 .5rem; }
+.adjustment-preview p { font-size: .8rem; }
+.adjustment-preview ul { padding-left: 1.2rem; font-size: .8rem; }
+.adjustment-preview li { padding: .3rem 0; overflow-wrap: anywhere; }
+.adjustment-preview li strong { display: block; }
+.confirm-adjustment { width: 100%; margin-top: .75rem; }
 .route-row { display: flex; align-items: center; gap: .85rem; padding: .85rem 0; border-bottom: 1px solid #e1e5d9; }
 .route-row:first-child { padding-top: 0; }
 .route-row:last-child { border: 0; padding-bottom: 0; }

@@ -139,7 +139,7 @@ test("one and two reverse legs free real shared capacity without requiring a pre
   const full = adjust(two, part, codes, 3);
   assert.deepEqual(analyze(two, full), analyze(two, two.reference));
   assert.equal(execute(two, cloneRoutes(two.reference), ["S"]).stars, 3, "directly replacing the draft is also allowed");
-  assert.throws(() => adjust(two, part, codes, 4), /增加或撤回/);
+  assert.throws(() => adjust(two, part, codes, 4), /总仓 → 南站最多能增加 3 箱/);
   assert.equal(analyze(two, two.seed).total, 4, "the original draft was not mutated");
 });
 

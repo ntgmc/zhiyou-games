@@ -100,6 +100,9 @@ test("residual adjustments undo the shared route and decompose into executable r
   for (const [codes, amount] of [[["SB", "-AB", "AT"], 4], [["SB", "-AB", "AT"], 0], [["SB"], 1], [["SA", "-SA", "SB", "BT"], 1]]) {
     assert.throws(() => adjust(mission, before, codes, amount));
   }
+  assert.throws(() => adjust(mission, partial, ["SB", "-AB", "AT"], 3), /总仓 → 南站最多能增加 2 箱/);
+  assert.throws(() => adjust({ ...mission, budget: 17 }, before, ["SB", "-AB", "AT"], 3), /运输费用 18 点/);
+  assert.deepEqual(before, mission.seed, "a failed preview preserves the original plan");
   assert.equal(walk(mission, ["unknown"]), null);
   assert.equal(walk(mission, [null]), null);
   assert.equal(walk(mission, ["AT"]), null);

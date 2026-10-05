@@ -91,30 +91,67 @@ function renderMap(analysis: Analysis, editing: boolean): string {
 
 function renderBuilder(): string {
   const current = mission();
+  const residual = save.editing === "residual";
+  const analysis = analyze(current, save.routes);
   const nodes = walk(current, save.codes) ?? [current.source];
-  const available = moves(current, save.routes, save.editing === "residual");
+  const available = moves(current, save.routes, residual);
   const next = targets(current).some((place) => place.id === nodes.at(-1)) ? [] : available.filter((move) =>
     move.from === nodes.at(-1) && !nodes.includes(move.to));
   const complete = targets(current).some((place) => place.id === nodes.at(-1));
   const selected = save.codes.map((code) => available.find((move) => move.code === code));
   const limit = selected.length && selected.every(Boolean) ? Math.min(...selected.map((move) => move!.available)) : 0;
   const fee = selected.reduce((sum, move) => sum + (move?.cost ?? 0), 0);
-  return `<section class="panel builder" aria-labelledby="builder-title"><div class="panel-heading"><h2 id="builder-title">${save.editing === "residual" ? "改排已有路线" : "安排一条路线"}</h2><span>${complete ? "已选到接收站" : "从总仓开始选"}</span></div>
+  let preview = "";
+  let blocked = "";
+  if (residual && analysis.errors.length) blocked = "原计划已超出容量、库存或预算。先修改下方计划的箱数，或删除超出的路线，再来改排。";
+  else if (residual && complete) {
+    try {
+      const routes = adjust(current, save.routes, save.codes, save.amount);
+      const after = analyze(current, routes);
+      preview = `<section class="adjustment-preview" aria-labelledby="preview-title"><h3 id="preview-title">确认后会这样送货</h3>
+        <p>预计送达 ${analysis.total} → <strong>${after.total} 箱</strong> · 运费 ${analysis.cost} → <strong>${after.cost} 点</strong></p>
+        <ul>${routes.map((route) => `<li>${h(pathName(route.nodes))}<strong>${route.amount} 箱</strong></li>`).join("")}</ul>
+        <p class="muted">这些才是实际送货路线。确认改排后会更新下方运输计划。</p></section>`;
+    } catch (error) { blocked = error instanceof Error ? error.message : "这份调整暂时不能确认，请重新选段。"; }
+  }
+  const learning = current.id === 5 && save.mode === "story" && guideStep(save.guide, current.id) === "residual";
+  let instruction = "";
+  if (learning) {
+    instruction = guideReady(save.guide, current, save.routes, save.side)
+      ? `改排成功，预计能送 ${analysis.total} 箱。看下方运输计划：原来经过北站、南站的箱子已经分到不同路线。核对后点“继续安排本班运输”。`
+      : !residual ? "先点“改排路线”，试着把旧计划中的一段拆开。"
+      : !save.codes.length ? "第 1 步：点“增加 总仓 → 南站”，先给还在总仓的箱子安排去南站的通道。"
+      : save.codes.length === 1 && save.codes[0] === "SB" ? "第 2 步：点“撤回 北站 → 南站”。旧计划中这 3 箱改由北站直送；南站到河岸站的安排留给从总仓来的箱子。"
+      : save.codes.length === 2 && save.codes[1] === "-AB" ? "第 3 步：点“增加 北站 → 河岸站”，接好旧箱子的后半程。"
+      : complete ? "最后填新增送达箱数。填 3 箱，看看下面如何变成两条各送 3 箱的路线，再点“确认改排”。"
+      : "继续选到河岸站。选错了可以退回一步；确认前，旧计划不会改变。";
+  }
+  return `<section class="panel builder ${residual ? "residual-builder" : ""}" aria-labelledby="builder-title"><div class="panel-heading"><h2 id="builder-title">${residual ? "改排已有路线" : "安排一条路线"}</h2><span>${complete ? "已选到接收站" : `当前：${h(placeName(current, nodes.at(-1)!))}`}</span></div>
     <div class="panel-body">${current.id >= 5 ? `<div class="segmented"><button data-command="route-mode" aria-pressed="${save.editing === "route"}">新增路线</button>
     <button data-command="residual-mode" aria-pressed="${save.editing === "residual"}">改排路线</button></div>` : ""}
-    <ol class="path"><li>${h(placeName(current, current.source))}</li>${save.codes.map((code, index) => `<li class="${code.startsWith("-") ? "undo-leg" : ""}">${code.startsWith("-")
-      ? `<small>撤回 ${h(placeName(current, nodes[index + 1]))} → ${h(placeName(current, nodes[index]))}</small>` : ""}${h(placeName(current, nodes[index + 1]))}</li>`).join("")}</ol>
-    <p class="field-label">${complete ? "路线已选好，填写这次安排的箱数。" : "下一段走哪里？"}</p>
+    ${residual && !learning ? '<p class="editing-help">从总仓选到接收站：“增加”给通道加箱数，“撤回”减少旧安排。虚线只用于调整计划，选完后会列出实际送货路线。</p>' : ""}
+    ${instruction ? `<p class="residual-guide" role="status">${h(instruction)}</p>` : ""}
+    ${residual ? `<h3 class="field-label">已选调整段</h3><ol class="adjustment-steps">${save.codes.length ? save.codes.map((code) => {
+      const edge = current.edges.find((item) => item.id === code.replace(/^-/, ""))!;
+      const reverse = code.startsWith("-");
+      const before = analysis.flow[edge.id];
+      return `<li class="${reverse ? "undo-leg" : ""}"><span>${reverse ? "撤回" : "增加"} ${h(placeName(current, edge.from))} → ${h(placeName(current, edge.to))}</span><small>${complete && !blocked ? `已安排 ${before} → ${before + (reverse ? -save.amount : save.amount)} 箱` : `${reverse ? "减少" : "增加"}这段的安排`}</small></li>`;
+    }).join("") : '<li class="muted">还没选段。从总仓的可用通道开始。</li>'}</ol>`
+      : `<ol class="path"><li>${h(placeName(current, current.source))}</li>${nodes.slice(1).map((id) => `<li>${h(placeName(current, id))}</li>`).join("")}</ol>`}
+    ${residual && complete ? "" : `<p class="field-label">${complete ? "路线已选好，填写这次安排的箱数。" : residual ? `当前调整到${h(placeName(current, nodes.at(-1)!))}，下一段改哪里？` : "下一段走哪里？"}</p>`}
     <div class="choices">${next.map((move) => `<button data-move="${move.code}"><span>${move.reverse
-      ? `撤回 ${h(placeName(current, move.to))} → ${h(placeName(current, move.from))}` : `去${h(placeName(current, move.to))}`}</span>
-      ${current.id >= 3 ? `<small>最多${move.reverse ? "撤回" : "再运"} ${move.available} 箱</small>` : ""}</button>`).join("")}</div>
+      ? `撤回 ${h(placeName(current, move.to))} → ${h(placeName(current, move.from))}` : residual ? `增加 ${h(placeName(current, move.from))} → ${h(placeName(current, move.to))}` : `去${h(placeName(current, move.to))}`}</span>
+      ${current.id >= 3 ? `<small>最多${move.reverse ? "撤回" : "再运"} ${move.available} 箱${move.reverse ? ` · 接着选${h(placeName(current, move.to))}的通道` : ""}</small>` : ""}</button>`).join("")}</div>
     ${!complete && !next.length ? `<p class="error">这里没有能继续走的通道。退回一步换路，或修改下面的运输计划。</p>` : ""}
-    ${current.id >= 2 && save.codes.length ? `<div class="route-estimate"><p>每箱${save.editing === "residual" ? fee < 0 ? "减少费用" : "增加费用" : "运费"}<strong>${Math.abs(fee)} <small>点</small></strong></p>
-    ${current.id >= 3 ? `<p>沿途最多${save.editing === "residual" ? "调整" : "再运"}<strong>${limit} <small>箱</small></strong></p>` : ""}</div>` : ""}
-    <div class="add-route"><label class="quantity" for="new-amount">安排箱数<input id="new-amount" type="number" min="1" max="100" step="1" value="${save.amount}" data-field="amount" /></label>
-    <button class="primary" data-command="add" ${complete ? "" : "disabled"}>${save.editing === "residual" ? "确认改排" : "加入运输计划"}</button></div>
-    <div class="path-actions"><button class="text-button" data-command="back" ${save.codes.length ? "" : "disabled"}>退回一步</button><button class="text-button" data-command="clear-path" ${save.codes.length ? "" : "disabled"}>重新选路线</button></div>
-    <p class="muted">这里只记录路线和箱数。点“执行本班运输”后，才会按计划送货。${save.editing === "residual" ? "每次改排都要从总仓选到接收站，增加预计送达的箱数；只想换一条路线，可以直接删改运输计划。" : ""}</p></div></section>`;
+    ${current.id >= 2 && save.codes.length && !residual ? `<div class="route-estimate"><p>每箱运费<strong>${Math.abs(fee)} <small>点</small></strong></p>
+    ${current.id >= 3 ? `<p>沿途最多再运<strong>${limit} <small>箱</small></strong></p>` : ""}</div>` : ""}
+    ${!residual || complete ? `<div class="add-route"><label class="quantity" for="new-amount">${residual ? "新增送达箱数" : "安排箱数"}<input id="new-amount" type="number" min="1" max="100" step="1" value="${save.amount}" data-field="amount" ${residual ? 'aria-describedby="adjustment-amount-help"' : ""} /></label>
+    ${!residual ? `<button class="primary" data-command="add" ${complete ? "" : "disabled"}>加入运输计划</button>` : ""}</div>` : ""}
+    ${residual && complete ? `<p class="muted" id="adjustment-amount-help">每个增加段加 ${save.amount} 箱，每个撤回段减 ${save.amount} 箱，最终多送 ${save.amount} 箱。最多可填 ${limit} 箱。</p>` : ""}
+    ${blocked ? `<p class="error" role="alert">${h(blocked)}</p>` : preview}
+    ${residual && complete ? `<button class="primary confirm-adjustment" data-command="add" ${blocked ? "disabled" : ""}>确认改排</button>` : ""}
+    <div class="path-actions"><button class="text-button" data-command="back" ${save.codes.length ? "" : "disabled"}>退回一步</button><button class="text-button" data-command="clear-path" ${save.codes.length ? "" : "disabled"}>${residual ? "重新选调整段" : "重新选路线"}</button></div>
+    <p class="muted">这里只记录路线和箱数。点“执行本班运输”后，才会按计划送货。${residual ? "只想替换一条旧路线，可在下方删除它，再用“新增路线”安排。" : ""}</p></div></section>`;
 }
 
 function renderRoutes(): string {
@@ -193,7 +230,7 @@ function renderPlay(): string {
     ${current.id >= 2 ? `<div class="${analysis.cost > current.budget ? "over-budget" : ""}"><span>计划运费</span><strong>${analysis.cost} <small>/ ${current.budget} 点</small></strong></div>` : ""}
     ${!guiding ? `<div class="goal-note"><span>通过要求</span><p>各站收齐补给${current.costGoal !== undefined ? `，运费不超过 ${current.costGoal} 点` : ""}${current.certificate ? "，送达量等于分界容量" : ""}。</p><small>完成后运费不超过 ${current.efficient} 点，可获 3 星。</small></div>` : ""}</div>
     ${!save.result && current.id >= 15 ? `<div class="planning-status" aria-label="整班计划合计"><span>${targets(current).map(p => `<span class="station-status">${h(p.name)} ${analysis.delivered[p.id]}/${p.need} 箱</span>`).join(" · ")}<br>已安排 ${analysis.total}/${current.supply} 箱 · 运费 ${analysis.cost}/${current.costGoal ?? current.budget} 点${current.costGoal !== undefined ? "（交班目标）" : ""}</span><a href="#routes-title">核对路线 ↓</a></div>` : ""}
-    <div class="workspace"><section class="panel map-panel" aria-labelledby="map-title"><div class="panel-heading"><h2 id="map-title">本班路网</h2><span>${editing ? "点击地点或使用通道按钮选路" : current.certificate ? "橙色通道跨出所选分界" : "查看本班路线"}</span></div>${renderMap(analysis, editing)}</section>
+    <div class="workspace"><section class="panel map-panel" aria-labelledby="map-title"><div class="panel-heading"><h2 id="map-title">本班路网</h2><span>${editing ? save.editing === "residual" ? "图上是当前计划，选完后查看改排预览" : "点击地点或使用通道按钮选路" : current.certificate ? "橙色通道跨出所选分界" : "查看本班路线"}</span></div>${renderMap(analysis, editing)}</section>
     ${editing ? renderBuilder() : guiding && step === "cut" ? `<div class="panel cut-panel"><div class="panel-body">${renderCut(analysis)}</div></div>` : ""}
     ${renderRoutes()}<section class="panel decision-panel" aria-label="${guiding ? "完成本步操作" : "确认发货"}"><div class="panel-body">
     ${current.certificate && !guiding ? renderCut(analysis) : ""}
@@ -213,7 +250,7 @@ function renderManual(): string {
     ${id >= 2 ? "<p>每箱运费是沿途各段费用的总和，再乘箱数，就是这条路线的总运费。例如每箱 3 点，运 2 箱就花 6 点。这里的“最短路径”按费用比较，地图距离不参与计算。各段运费都是大于或等于零的整数。</p>" : ""}
     ${id >= 3 ? "<p>“容量”是一条通道本班最多能运的箱数，“流量”是计划中安排在这段通道上的箱数。多条路线共用通道时要合计检查。中转站收到多少箱就转出多少箱，这叫“流量守恒”。完整路线上的箱数始终相同，保证了进出相等。</p>" : ""}
     ${id >= 4 ? "<p>每段通道不超容量、中转站进出相等时，最多能送到接收站的箱数叫“最大流”。它只说明路网的运输能力；实际发货还要有足够的库存和预算。</p>" : ""}
-    ${id >= 5 ? "<p>“残量网络”显示两类选择：顺着原通道增加运输，或撤回原计划中的一段安排。撤回会减少该段已安排的箱数，也会扣除相应运费。反向箭头只表示修改计划，不让箱子倒着运。“改排路线”要选完整的总仓到接收站路径，每次增加预计送达的箱数；单纯换路线可直接删除旧路线，再新增一条。</p>" : ""}
+    ${id >= 5 ? "<p>想在已有计划上多送一些箱子，点“改排路线”。从总仓开始选调整段：选“增加”会给原通道加箱数；选“撤回”会减少旧安排，并扣除该段运费。每选一段，接着从调整到的地点选下一段，直到接收站。还能增加的通道和能撤回的通道合起来叫“残量网络”。虚线表示修改旧安排，实际送货仍沿原通道方向。</p><p>填写“新增送达箱数”后，每个增加段加上这个箱数，每个撤回段减去这个箱数。例如第 5 章增加总仓 → 南站、撤回北站 → 南站、增加北站 → 河岸站，各调整 3 箱，旧计划就变成经北站、经南站各送 3 箱。确认前会显示通道变化和实际送货路线；点“确认改排”更新计划，最后再确认发货。单纯替换旧路线，可在运输计划里删除它，再用“新增路线”安排。</p>" : ""}
     ${id >= 6 ? "<p>把地点分为总仓所在的一组和接收站所在的一组，两组之间的分界叫“割”。从总仓这一组跨出的原通道容量相加，得到“割容量”；反方向跨回来的通道不计入。所有运输都要跨过分界，所以送达量不可能超过这个和。容量最小的割叫“最小割”。合法方案的送达量等于某个割容量，就同时找到了最大流和最小割。本章证明的是道路容量上限，库存和预算还要分别检查。</p>" : ""}
     <p>点“执行本班运输”会一次完成整份计划，箱子全部按路线到站。游戏不计算每段路要走多久，中转站也不会留下箱子。没有车辆排队、拥堵或运输损耗。通道都是临时单向通道，容量和费用是本游戏设定的数值。</p>
     <p>重试使用相同的地图、库存和预算，方便比较不同方案。第 1～6 章学习选路、容量、反向调整和割证明，第 7～12 章独立安排路线与分界，第 13～18 章重排草案、比较多站运输，第 19～24 章完成街区综合调度。可从章节菜单重看或继续任意一章。</p></div></details>`;
@@ -249,10 +286,8 @@ function updateInput(event: Event): void {
   } else {
     const amount = Number(input.value);
     if (!Number.isInteger(amount) || amount < 1 || amount > 100) {
-      if (event.type === "input") { input.setAttribute("aria-invalid", "true"); return; }
-      input.removeAttribute("aria-invalid");
-      input.value = String(input.dataset.route ? save.routes[Number(input.dataset.route)].amount : save.amount);
-      announce("请输入 1 到 100 之间的整数箱数。");
+      input.setAttribute("aria-invalid", "true");
+      if (event.type === "change") announce("请输入 1 到 100 之间的整数箱数。");
       return;
     }
     if (input.dataset.route !== undefined) save.routes[Number(input.dataset.route)].amount = amount;
@@ -272,6 +307,7 @@ root.addEventListener("click", (event) => {
   if (!button || button.disabled) return;
   const current = mission();
   let focusTarget = "#desk";
+  let feedback = "";
   try {
     if (button.dataset.command === "add" || button.dataset.command === "execute") {
       if (root!.querySelector('input[type="number"][aria-invalid="true"]')) throw new Error("请先修改标出的箱数，输入 1 到 100 之间的整数。");
@@ -294,19 +330,25 @@ root.addEventListener("click", (event) => {
         case "menu": menu = !menu; focusTarget = menu ? "#chapters-title" : "#desk"; break;
         case "mode": save.mode = save.mode === "story" ? "desk" : "story"; break;
         case "replay": delete save.chapters?.[current.id]; startChapter(save, current.id); save.mode = "story"; menu = false; hintsOpen = false; break;
-        case "advance": advanceGuide(save.guide, current, save.routes, save.side); break;
+        case "advance":
+          advanceGuide(save.guide, current, save.routes, save.side);
+          if (current.id === 5 && guideStep(save.guide, current.id) === "residual" && !save.codes.length) save.editing = "residual";
+          break;
         case "capacity-test": save.guide.observed = true; break;
         case "route-mode": case "residual-mode":
           save.editing = button.dataset.command === "route-mode" ? "route" : "residual"; save.codes = []; focusTarget = "#builder-title"; break;
         case "back": save.codes.pop(); focusTarget = "#builder-title"; break;
         case "clear-path": save.codes = []; focusTarget = "#builder-title"; break;
         case "add": {
-          if (save.routes.length >= 64) throw new Error("最多能安排 64 条路线，请先删除多余路线。相同路线可以合并箱数。");
           if (save.editing === "residual") {
+            const before = analyze(current, save.routes);
             const next = adjust(current, save.routes, save.codes, save.amount);
             save.guide.reversed ||= save.codes.some((code) => code.startsWith("-"));
             save.routes = next;
+            const after = analyze(current, next);
+            feedback = `已改排：预计送达 ${before.total} → ${after.total} 箱，运费 ${before.cost} → ${after.cost} 点。实际送货路线已更新。`;
           } else {
+            if (save.routes.length >= 64) throw new Error("最多能安排 64 条路线，请先删除多余路线。相同路线可以合并箱数。");
             const route = { nodes: walk(current, save.codes) ?? [], amount: save.amount };
             const error = routeError(current, route);
             if (error) throw new Error(error);
@@ -331,7 +373,7 @@ root.addEventListener("click", (event) => {
     const focus = root!.querySelector<HTMLElement>(focusTarget);
     if (focus) { if (!(focus instanceof HTMLButtonElement)) focus.tabIndex = -1; focus.focus({ preventScroll: ["#builder-title", "#routes-title", "#hint-content"].includes(focusTarget) }); }
     announce(storageFailed ? "这次未能保存，请查看页面底部说明。" : save.result
-      ? save.result.passed ? "本班目标完成，成绩已保存。" : "这份计划还有目标未完成，请查看接收站回报。" : "运输计划和引导进度已保存。");
+      ? save.result.passed ? "本班目标完成，成绩已保存。" : "这份计划还有目标未完成，请查看接收站回报。" : feedback || "运输计划和引导进度已保存。");
   } catch (error) {
     announce(error instanceof Error ? error.message : "这次操作未能完成。");
   }
