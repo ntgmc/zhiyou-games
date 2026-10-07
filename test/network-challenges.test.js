@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adjust, analyze, cloneRoutes, cutFor, execute, targets, walk } from "../.build/src/games/network/engine.js";
+import { analyze, cloneRoutes, cutFor, execute, replaceRoute, targets } from "../.build/src/games/network/engine.js";
 import { MISSIONS } from "../.build/src/games/network/missions.js";
 import { advanceGuide, guideLength, guideStep } from "../.build/src/games/network/story.js";
 import { freshSave, readSave, recordScore, startChapter } from "../.build/src/games/network/storage.js";
@@ -124,23 +124,19 @@ test("internal cuts prove current capacity and exclude inbound arrows from the b
   assert.equal(execute(expanded, expanded.reference, expanded.places.filter(p => !p.need).map(p => p.id)).passed, false);
 });
 
-test("one and two reverse legs free real shared capacity without requiring a prescribed solution", () => {
-  const one = MISSIONS[12], two = MISSIONS[13];
-  assert.equal(analyze(one, cheapestFirst(one, one.seed)).total, 4);
-  const first = adjust(one, one.seed, ["SB", "-AB", "AT"], 4);
-  assert.deepEqual(analyze(one, first), analyze(one, one.reference));
-  assert.equal(analyze(two, cheapestFirst(two, two.seed)).total, 4);
-  const codes = ["SB", "-CB", "-AC", "AT"];
-  assert.deepEqual(walk(two, codes), ["S", "B", "C", "A", "T"]);
-  const part = adjust(two, two.seed, codes, 1);
-  assert.equal(analyze(two, part).flow.CB, 3);
-  assert.equal(analyze(two, part).flow.AC, 3);
-  assert.equal(analyze(two, part).total, 5);
-  const full = adjust(two, part, codes, 3);
-  assert.deepEqual(analyze(two, full), analyze(two, two.reference));
-  assert.equal(execute(two, cloneRoutes(two.reference), ["S"]).stars, 3, "directly replacing the draft is also allowed");
-  assert.throws(() => adjust(two, part, codes, 4), /总仓 → 南站最多能增加 3 箱/);
-  assert.equal(analyze(two, two.seed).total, 4, "the original draft was not mutated");
+test("direct route edits free shared capacity in both rerouting duties and accept alternate plans", () => {
+  for (const mission of [MISSIONS[12], MISSIONS[13]]) {
+    assert.equal(analyze(mission, cheapestFirst(mission, mission.seed)).total, 4);
+    const rerouted = replaceRoute(mission, mission.seed, 0, mission.reference[0]);
+    assert.equal(rerouted.length, 1);
+    const completed = cheapestFirst(mission, rerouted);
+    assert.deepEqual(analyze(mission, completed), analyze(mission, mission.reference));
+    assert.equal(execute(mission, completed, ["S"]).stars, 3);
+    const alternate = replaceRoute(mission, mission.seed, 0, mission.reference[1]);
+    alternate.push(...cloneRoutes(mission.reference.slice(0, 1)));
+    assert.equal(execute(mission, alternate, ["S"]).stars, 3);
+    assert.equal(analyze(mission, mission.seed).total, 4, "the original draft was not mutated");
+  }
 });
 
 test("cheap-first choices strand a receiver or exceed the final fee target even after all boxes arrive", () => {
@@ -191,7 +187,7 @@ test("the final duty accepts alternative three-star route allocations and an ind
   assert.throws(() => execute(final, overloaded, ["S"]), /容量/);
 });
 
-test("old chapter eight continues to nine; long drafts, residual paths, cuts, scores and backups restore", () => {
+test("old chapter eight continues to nine; long drafts, route edits, cuts, scores and backups restore", () => {
   let save = freshSave();
   startChapter(save, 8);
   save.routes = cloneRoutes(MISSIONS[7].reference);
@@ -217,11 +213,14 @@ test("old chapter eight continues to nine; long drafts, residual paths, cuts, sc
   const final = structuredClone(save);
   save.chapters = archiveChapter(save);
   startChapter(save, 14);
-  save.editing = "residual";
-  save.codes = ["SB", "-CB", "-AC"];
+  save.editing = 0;
+  save.codes = ["SA"];
   save.amount = 2;
   assert.deepEqual(readSave("path", { getItem: () => JSON.stringify(save) }), save);
-  save.chapters = archiveChapter(save);
+  assert.deepEqual(importBackup(exportBackup("network", save, readSave), "network", readSave), save);
+  const legacy = { ...save, editing: "residual", codes: ["SB", "-CB", "-AC"] };
+  assert.deepEqual(importBackup(JSON.stringify({ format: "zhiyou-save", version: 1, game: "network", save: legacy }), "network", readSave), legacy);
+  save.chapters = archiveChapter(legacy);
   const restored = resumeChapter(save, 24, readSave, { best: save.best, solo: save.solo, unlocked: save.unlocked, mode: save.mode });
   assert.deepEqual(restored.result, final.result);
   const backup = exportBackup("network", restored, readSave);

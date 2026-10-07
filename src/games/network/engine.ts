@@ -61,7 +61,6 @@ export interface Move {
   to: string;
   available: number;
   cost: number;
-  reverse: boolean;
 }
 export const placeName = (mission: Mission, id: string): string => mission.places.find((place) => place.id === id)?.name ?? id;
 export const targets = (mission: Mission): readonly Place[] => mission.places.filter((place) => (place.need ?? 0) > 0);
@@ -138,70 +137,35 @@ export function execute(mission: Mission, routes: readonly Route[], side: readon
   return { passed, stars: passed ? analysis.cost <= mission.efficient ? 3 : 2 : 0, analysis, cut, failures };
 }
 
-export function moves(mission: Mission, routes: readonly Route[], reverse: boolean): Move[] {
+export function moves(mission: Mission, routes: readonly Route[]): Move[] {
   const { flow } = analyze(mission, routes);
-  return mission.edges.flatMap((edge): Move[] => {
-    const result: Move[] = [];
-    if (edge.capacity > flow[edge.id]) result.push({
-      code: edge.id, from: edge.from, to: edge.to, available: edge.capacity - flow[edge.id], cost: edge.cost, reverse: false,
-    });
-    if (reverse && flow[edge.id] > 0) result.push({
-      code: `-${edge.id}`, from: edge.to, to: edge.from, available: flow[edge.id], cost: -edge.cost, reverse: true,
-    });
-    return result;
-  });
+  return mission.edges.filter((edge) => edge.capacity > flow[edge.id]).map((edge) => ({
+    code: edge.id, from: edge.from, to: edge.to, available: edge.capacity - flow[edge.id], cost: edge.cost,
+  }));
 }
 
-export function walk(mission: Mission, codes: readonly string[]): string[] | null {
+export function walk(mission: Mission, codes: readonly string[], legacy = false): string[] | null {
   if (!Array.isArray(codes) || codes.length >= mission.places.length) return null;
   const nodes = [mission.source];
   for (const code of codes) {
     if (typeof code !== "string") return null;
-    const edge = mission.edges.find((item) => item.id === code.replace(/^-/, ""));
+    const reverse = legacy && code.startsWith("-");
+    const edge = mission.edges.find((item) => item.id === (reverse ? code.slice(1) : code));
     if (!edge) return null;
-    const from = code.startsWith("-") ? edge.to : edge.from;
-    const to = code.startsWith("-") ? edge.from : edge.to;
+    const from = reverse ? edge.to : edge.from;
+    const to = reverse ? edge.from : edge.to;
     if (from !== nodes.at(-1) || nodes.includes(to) || targets(mission).some((place) => place.id === from)) return null;
     nodes.push(to);
   }
   return nodes;
 }
 
-export function adjust(mission: Mission, routes: readonly Route[], codes: readonly string[], amount: number): Route[] {
-  const analysis = analyze(mission, routes);
-  if (analysis.errors.length) throw new Error("原计划已经超出容量、库存或预算。请先修改箱数或删除路线，再改排。");
-  const nodes = walk(mission, codes);
-  if (!nodes || !targets(mission).some((place) => place.id === nodes.at(-1))
-    || !Number.isInteger(amount) || amount < 1 || amount > 100) {
-    throw new Error("改排时也要从总仓选到接收站，并填写 1 到 100 之间的整数箱数。");
-  }
-  const available = moves(mission, routes, true);
-  for (const code of codes) {
-    const move = available.find((item) => item.code === code);
-    if (!move || move.available < amount) {
-      const edge = mission.edges.find((item) => item.id === code.replace(/^-/, ""))!;
-      throw new Error(`${placeName(mission, edge.from)} → ${placeName(mission, edge.to)}最多能${code.startsWith("-") ? "撤回" : "增加"} ${move?.available ?? 0} 箱，这次填了 ${amount} 箱。请减少“新增送达箱数”。`);
-    }
-    analysis.flow[code.replace(/^-/, "")] += code.startsWith("-") ? -amount : amount;
-  }
-  // Decompose the adjusted flow back into ordinary delivery routes.
-  const result: Route[] = [];
-  const findPath = (from: string, visited: string[]): string[] | null => {
-    if (targets(mission).some((place) => place.id === from)) return visited;
-    for (const edge of mission.edges.filter((item) => item.from === from && analysis.flow[item.id] > 0)) {
-      if (visited.includes(edge.to)) continue;
-      const path = findPath(edge.to, [...visited, edge.to]);
-      if (path) return path;
-    }
-    return null;
-  };
-  for (let path = findPath(mission.source, [mission.source]); path; path = findPath(mission.source, [mission.source])) {
-    const edges = path.slice(1).map((to, i) => mission.edges.find((edge) => edge.from === path![i] && edge.to === to)!);
-    const count = Math.min(...edges.map((edge) => analysis.flow[edge.id]));
-    result.push({ nodes: path, amount: count });
-    for (const edge of edges) analysis.flow[edge.id] -= count;
-  }
-  if (Object.values(analysis.flow).some((value) => value !== 0)) throw new Error("这次改排让部分箱子绕圈，无法组成完整的送货路线。请换一条调整路径。");
+export function replaceRoute(mission: Mission, routes: readonly Route[], index: number, route: Route): Route[] {
+  if (!Number.isInteger(index) || !routes[index]) throw new Error("这条路线不存在，请重新选择要改排的路线。");
+  const error = routeError(mission, route);
+  if (error) throw new Error(error);
+  const result = cloneRoutes(routes);
+  result[index] = { nodes: [...route.nodes], amount: route.amount };
   const errors = analyze(mission, result).errors;
   if (errors.length) throw new Error(errors.join(" "));
   return result;

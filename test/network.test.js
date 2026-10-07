@@ -1,8 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adjust, analyze, cloneRoutes, cutFor, execute, moves, routeError, targets, walk } from "../.build/src/games/network/engine.js";
+import { analyze, cloneRoutes, cutFor, execute, moves, replaceRoute, routeError, targets, walk } from "../.build/src/games/network/engine.js";
 import { MISSIONS } from "../.build/src/games/network/missions.js";
-import { reverseRoadPath } from "../.build/src/games/network/roads.js";
 import { advanceGuide, freshGuide, guideLength, guideReady, guideStep, guideText, renderHints } from "../.build/src/games/network/story.js";
 import { freshSave, readSave, recordScore, startChapter, writeSave } from "../.build/src/games/network/storage.js";
 
@@ -62,21 +61,6 @@ test("all eight foundational references execute, and independently enumerated ro
   }
 });
 
-test("reverse road arrows stay beside vertical, horizontal and curved roads", () => {
-  for (const [x1, y1, x2, y2, bend] of [[100, 40, 100, 180, 0], [160, 200, 20, 200, 0], [240, 320, 400, 120, -65]]) {
-    const points = reverseRoadPath(x1, y1, x2, y2, bend).match(/-?\d+(?:\.\d+)?/g).map(Number);
-    const offsetX = points[0] - x2, offsetY = points[1] - y2;
-    assert.ok(Math.abs(Math.hypot(offsetX, offsetY) - 9) < 1e-9, "visible separation is nine map units");
-    assert.ok(Math.abs((x2 - x1) * offsetX + (y2 - y1) * offsetY) < 1e-9, "offset is perpendicular to the road");
-    assert.ok((x2 - x1) * offsetY - (y2 - y1) * offsetX > 0, "reverse arrows stay on the same side of each road");
-    const anchors = [[x2, y2], [(x1 + x2) / 2, (y1 + y2) / 2 + bend], [x1, y1]];
-    anchors.forEach(([x, y], i) => {
-      assert.ok(Math.abs(points[i * 2] - x - offsetX) < 1e-9);
-      assert.ok(Math.abs(points[i * 2 + 1] - y - offsetY) < 1e-9);
-    });
-  }
-});
-
 test("shared capacity, route directions, source supply and fees are hard constraints", () => {
   const mission = MISSIONS[3];
   const overloaded = [{ nodes: ["S", "A", "C", "T"], amount: 3 }, { nodes: ["S", "B", "C", "T"], amount: 2 }];
@@ -97,28 +81,33 @@ test("shared capacity, route directions, source supply and fees are hard constra
   assert.equal(execute(MISSIONS[0], [], ["S"]).passed, false);
 });
 
-test("residual adjustments undo the shared route and decompose into executable routes", () => {
+test("rerouting replaces one route atomically, frees its capacity and validates the whole plan", () => {
   const mission = MISSIONS[4];
   const before = cloneRoutes(mission.seed);
-  assert.equal(analyze(mission, before).total, 3);
-  assert.equal(analyze(mission, before).cost, 6);
-  assert.equal(moves(mission, before, false).some((move) => move.from === "S"), true);
-  assert.equal(moves(mission, before, true).find((move) => move.code === "-AB").available, 3);
-  assert.deepEqual(walk(mission, ["SB", "-AB", "AT"]), ["S", "B", "A", "T"]);
-  const partial = adjust(mission, before, ["SB", "-AB", "AT"], 1);
-  assert.equal(analyze(mission, partial).total, 4);
-  assert.equal(analyze(mission, partial).flow.AB, 2);
-  assert.equal(analyze(mission, partial).cost, 10);
-  const after = adjust(mission, partial, ["SB", "-AB", "AT"], 2);
+  const route = { nodes: ["S", "A", "T"], amount: 3 };
+  assert.equal(moves(mission, before).some(move => move.code === "SA"), false);
+  assert.equal(moves(mission, before.filter((_, index) => index !== 0)).find(move => move.code === "SA").available, 3);
+  const rerouted = replaceRoute(mission, before, 0, route);
+  assert.equal(rerouted.length, before.length, "saving replaces rather than appends");
+  assert.equal(analyze(mission, rerouted).flow.BT, 0);
+  assert.equal(analyze(mission, rerouted).cost, 9);
+  assert.deepEqual(before, mission.seed, "preview and saving leave the input untouched");
+  const after = [...rerouted, { nodes: ["S", "B", "T"], amount: 3 }];
   assert.deepEqual(analyze(mission, after), analyze(mission, mission.reference));
-  assert.equal(execute(mission, after, ["S"]).passed, true);
-  assert.deepEqual(before, mission.seed, "adjustment never mutates the input");
-  for (const [codes, amount] of [[["SB", "-AB", "AT"], 4], [["SB", "-AB", "AT"], 0], [["SB"], 1], [["SA", "-SA", "SB", "BT"], 1]]) {
-    assert.throws(() => adjust(mission, before, codes, amount));
+  assert.equal(execute(mission, after, ["S"]).stars, 3);
+  assert.throws(() => replaceRoute(mission, after, 1, route), /容量/);
+  assert.throws(() => replaceRoute({ ...mission, budget: 8 }, before, 0, route), /预算/);
+  assert.throws(() => replaceRoute({ ...mission, supply: 2 }, before, 0, route), /总仓只有/);
+  for (const index of [-1, 1, .5, NaN]) assert.throws(() => replaceRoute(mission, before, index, route));
+  for (const bad of [{ nodes: ["S", "A"], amount: 3 }, { nodes: ["S", "T"], amount: 3 },
+    { nodes: ["S", "A", "T"], amount: 4 }, { nodes: ["S", "A", "T"], amount: 1.5 }]) {
+    assert.throws(() => replaceRoute(mission, before, 0, bad));
   }
-  assert.throws(() => adjust(mission, partial, ["SB", "-AB", "AT"], 3), /总仓 → 南站最多能增加 2 箱/);
-  assert.throws(() => adjust({ ...mission, budget: 17 }, before, ["SB", "-AB", "AT"], 3), /运输费用 18 点/);
-  assert.deepEqual(before, mission.seed, "a failed preview preserves the original plan");
+  assert.deepEqual(before, mission.seed, "failed edits preserve the plan");
+  route.nodes[1] = "B";
+  route.amount = 1;
+  assert.deepEqual(rerouted, [{ nodes: ["S", "A", "T"], amount: 3 }], "the saved route owns its data");
+  assert.equal(walk(mission, ["SB", "-AB", "AT"]), null);
   assert.equal(walk(mission, ["unknown"]), null);
   assert.equal(walk(mission, [null]), null);
   assert.equal(walk(mission, ["AT"]), null);
@@ -173,7 +162,8 @@ test("each tutorial gates its current experiment, accepts alternate operations a
       if (step === "route" || step === "cost" || step === "flow") save.routes = cloneRoutes(mission.reference);
       if (step === "capacity") save.guide.observed = true;
       if (step === "residual") {
-        save.routes = adjust(mission, save.routes, ["SB", "-AB", "AT"], 3);
+        save.routes = replaceRoute(mission, save.routes, 0, mission.reference[0]);
+        save.routes.push(...cloneRoutes(mission.reference.slice(1)));
         save.guide.reversed = true;
       }
       if (step === "cut") save.side = [...mission.referenceCut];
@@ -190,17 +180,28 @@ test("each tutorial gates its current experiment, accepts alternate operations a
     "teaching cost does not force a unique route");
 });
 
-test("save restores unfinished residual paths, drafts, cuts, scores, hints and execution from verified inputs", () => {
+test("save restores unfinished route edits, drafts, cuts, scores, hints and execution from verified inputs", () => {
   const storage = memory();
   const save = freshSave();
   startChapter(save, 5);
-  save.editing = "residual";
-  save.codes = ["SB", "-AB"];
+  save.editing = 0;
+  save.codes = ["SA"];
   save.amount = 2;
   save.guide.step = 1;
   save.mode = "desk";
   writeSave("normal", save, storage);
   assert.deepEqual(readSave("normal", storage), save);
+  const legacy = { ...save, editing: "residual", codes: ["SB", "-AB"] };
+  storage.setItem("legacy", JSON.stringify(legacy));
+  const migrated = readSave("legacy", storage);
+  assert.deepEqual(migrated.routes, save.routes, "old transport plans survive the retired editor");
+  assert.deepEqual(migrated.guide, save.guide);
+  assert.equal(migrated.editing, "residual", "legacy selections remain readable for backup validation");
+  assert.deepEqual(migrated.codes, legacy.codes);
+  for (const editing of [-1, save.routes.length, .5, null]) {
+    storage.setItem("bad-edit", JSON.stringify({ ...save, editing }));
+    assert.equal(readSave("bad-edit", storage).editing, "route");
+  }
   startChapter(save, 6);
   save.routes = cloneRoutes(MISSIONS[5].reference);
   save.side = [...MISSIONS[5].referenceCut];

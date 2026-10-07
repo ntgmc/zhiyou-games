@@ -14,7 +14,7 @@ export interface Save {
   routes: Route[];
   codes: string[];
   amount: number;
-  editing: "route" | "residual";
+  editing: "route" | number | "residual"; // Preserve the legacy value when validating old backups.
   side: string[];
   guide: Guide;
   mode: "story" | "desk";
@@ -71,9 +71,9 @@ export function readSave(key: string, storage?: Pick<Storage, "getItem">): Save 
     if (!Array.isArray(data.routes) || data.routes.length > 64 || data.routes.some((route: unknown) => routeError(mission, route))) return save;
     save.routes = cloneRoutes(data.routes);
     save.guide = readGuide(data.guide, mission.id);
-    save.editing = data.editing === "residual" && mission.id >= 5 ? "residual" : "route";
-    if (Array.isArray(data.codes) && walk(mission, data.codes)
-      && (save.editing === "residual" || !data.codes.some((code: string) => code.startsWith("-")))) save.codes = [...data.codes];
+    if (Number.isInteger(data.editing) && data.editing >= 0 && data.editing < save.routes.length) save.editing = data.editing;
+    else if (data.editing === "residual" && mission.id >= 5) save.editing = "residual";
+    if (Array.isArray(data.codes) && walk(mission, data.codes, save.editing === "residual")) save.codes = [...data.codes];
     if (Number.isInteger(data.amount) && data.amount >= 1 && data.amount <= 100) save.amount = data.amount;
     if (Array.isArray(data.side) && data.side.includes(mission.source) && new Set(data.side).size === data.side.length
       && data.side.every((id: unknown) => typeof id === "string" && mission.places.some((place) => place.id === id && !place.need))) save.side = [...data.side];
