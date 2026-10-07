@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { adjust, analyze, cloneRoutes, cutFor, execute, moves, routeError, targets, walk } from "../.build/src/games/network/engine.js";
 import { MISSIONS } from "../.build/src/games/network/missions.js";
+import { reverseRoadPath } from "../.build/src/games/network/roads.js";
 import { advanceGuide, freshGuide, guideLength, guideReady, guideStep, guideText, renderHints } from "../.build/src/games/network/story.js";
 import { freshSave, readSave, recordScore, startChapter, writeSave } from "../.build/src/games/network/storage.js";
 
@@ -58,6 +59,21 @@ test("all eight foundational references execute, and independently enumerated ro
     assert.equal(enumerated.minimum, mission.efficient, `minimum cost in chapter ${mission.id}`);
     assert.ok(enumerated.count > 0);
     if (mission.id >= 7) assert.ok(enumerated.count > 1, "independent chapters accept multiple plans");
+  }
+});
+
+test("reverse road arrows stay beside vertical, horizontal and curved roads", () => {
+  for (const [x1, y1, x2, y2, bend] of [[100, 40, 100, 180, 0], [160, 200, 20, 200, 0], [240, 320, 400, 120, -65]]) {
+    const points = reverseRoadPath(x1, y1, x2, y2, bend).match(/-?\d+(?:\.\d+)?/g).map(Number);
+    const offsetX = points[0] - x2, offsetY = points[1] - y2;
+    assert.ok(Math.abs(Math.hypot(offsetX, offsetY) - 9) < 1e-9, "visible separation is nine map units");
+    assert.ok(Math.abs((x2 - x1) * offsetX + (y2 - y1) * offsetY) < 1e-9, "offset is perpendicular to the road");
+    assert.ok((x2 - x1) * offsetY - (y2 - y1) * offsetX > 0, "reverse arrows stay on the same side of each road");
+    const anchors = [[x2, y2], [(x1 + x2) / 2, (y1 + y2) / 2 + bend], [x1, y1]];
+    anchors.forEach(([x, y], i) => {
+      assert.ok(Math.abs(points[i * 2] - x - offsetX) < 1e-9);
+      assert.ok(Math.abs(points[i * 2 + 1] - y - offsetY) < 1e-9);
+    });
   }
 });
 

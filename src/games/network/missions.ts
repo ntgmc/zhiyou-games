@@ -80,7 +80,7 @@ export const MISSIONS: readonly Mission[] = [
       place("C", "坡口站", 32, 82), place("D", "上桥头", 63, 25), place("E", "下桥头", 63, 75),
       place("T", "河岸站", 91, 50, 8, "周姨收齐了补给，河岸站的晚班可以继续分发。"),
     ],
-    edges: [edge("S", "A", 5), edge("S", "B", 4), edge("S", "C", 3, 2), edge("A", "D", 3),
+    edges: [edge("S", "A", 5), edge("S", "B", 4, 1, -50), edge("S", "C", 3, 2), edge("A", "D", 3),
       edge("A", "E", 2), edge("B", "D", 3), edge("B", "E", 2, 2), edge("C", "E", 2),
       edge("D", "T", 4), edge("E", "T", 4), edge("E", "D", 2)],
     source: "S", supply: 12, budget: 40, efficient: 26, certificate: true,

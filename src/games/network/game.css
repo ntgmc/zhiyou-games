@@ -80,7 +80,7 @@ main { max-width: 1380px; margin: auto; padding: 0 2rem 1.5rem; }
 .contour { fill: none; stroke: #d0dbc3; stroke-width: 1; opacity: .65; }
 .road path { fill: none; stroke: #8ea494; stroke-width: 2.5; }
 marker path { fill: #56786a; }
-.road text { font-size: 12px; font-weight: 600; fill: #345948; paint-order: stroke; stroke: var(--map); stroke-width: 6; stroke-linejoin: round; }
+.road-labels text { font-size: 12px; font-weight: 600; fill: #345948; paint-order: stroke; stroke: var(--map); stroke-width: 6; stroke-linejoin: round; }
 .road.used path { stroke: #428362; stroke-width: 4; }
 .road.selected path { stroke: #184f3e; stroke-width: 5; }
 .road.crossing path { stroke: #b17032; stroke-width: 5; }

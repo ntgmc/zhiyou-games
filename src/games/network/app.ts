@@ -6,6 +6,7 @@ import { GAME_MUSIC, installMusic } from "../../shared/music.js";
 import { adjust, analyze, cutFor, execute, moves, placeName, routeError, targets, walk } from "./engine.js";
 import type { Analysis, Mission } from "./engine.js";
 import { MISSIONS } from "./missions.js";
+import { reverseRoadPath } from "./roads.js";
 import { advanceGuide, guideLength, guideReady, guideStep, guideText, renderHints } from "./story.js";
 import { readSave, recordScore, SAVE_KEY, startChapter, writeSave } from "./storage.js";
 
@@ -47,6 +48,7 @@ function renderMap(analysis: Analysis, editing: boolean): string {
   const available = moves(current, save.routes, save.editing === "residual");
   const next = available.filter((move) => move.from === nodes.at(-1) && !nodes.includes(move.to));
   const cut = current.certificate ? cutFor(current, save.side) : null;
+  const labels: string[] = [];
   const lines = current.edges.map((edge) => {
     const from = current.places.find((place) => place.id === edge.from)!;
     const to = current.places.find((place) => place.id === edge.to)!;
@@ -69,15 +71,15 @@ function renderMap(analysis: Analysis, editing: boolean): string {
     const crossing = cut?.edges.includes(edge.id);
     const className = analysis.flow[edge.id] > edge.capacity ? "over" : crossing ? "crossing" : selected ? "selected" : analysis.flow[edge.id] ? "used" : "";
     const reverse = editing && save.editing === "residual" && analysis.flow[edge.id] > 0;
+    if (label) labels.push(`<text x="${labelX}" y="${labelY - 10}" text-anchor="middle">${h(label)}</text>`);
     return `<g class="road ${className}"><path d="M${x1} ${y1} Q${midX} ${midY + bend} ${x2} ${y2}" marker-end="url(#arrow)" />
-      ${label ? `<text x="${labelX}" y="${labelY - 10}" text-anchor="middle">${h(label)}</text>` : ""}
-      ${reverse ? `<path class="reverse-road" d="M${x2} ${y2 + 9} Q${midX} ${midY + bend + 9} ${x1} ${y1 + 9}" marker-end="url(#back-arrow)" />` : ""}</g>`;
+      ${reverse ? `<path class="reverse-road" d="${reverseRoadPath(x1, y1, x2, y2, bend)}" marker-end="url(#back-arrow)" />` : ""}</g>`;
   }).join("");
   return `<div class="map-scroll" tabindex="0" role="region" aria-label="路网地图，可横向滚动"><div class="network-map ${wide ? "wide" : ""}"><svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true" focusable="false">
     <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker>
     <marker id="back-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
     <path class="hill" d="M0 365 L145 160 L300 355 L430 105 L700 370" />
-    <path class="contour" d="M-50 350 Q145 15 325 260 T750 80 M-50 390 Q145 55 325 300 T750 120 M-50 430 Q145 95 325 340 T750 160" />${lines}</svg>
+    <path class="contour" d="M-50 350 Q145 15 325 260 T750 80 M-50 390 Q145 55 325 300 T750 120 M-50 430 Q145 95 325 340 T750 160" />${lines}<g class="road-labels">${labels.join("")}</g></svg>
     ${current.places.map((place) => `<button class="map-node ${place.need ? "destination" : ""} ${nodes.includes(place.id) && editing ? "on-path" : ""} ${cut && save.side.includes(place.id) ? "source-side" : ""}"
       style="left:${place.x}%;top:${place.y}%" data-node="${place.id}" ${!editing || save.result || (place.id !== current.source && !next.some((move) => move.to === place.id)) ? "disabled" : ""}
       aria-label="${h(place.name)}${place.need ? `，需要 ${place.need} 箱` : ""}">${h(place.name)}${place.need ? `<small>需 ${place.need} 箱</small>` : ""}</button>`).join("")}</div></div>
